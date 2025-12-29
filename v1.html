@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Vaidya AI Analytical Dashboard V8</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1f2937 0%, #0d1a26 100%);
+            color: #f3f4f6;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            touch-action: pan-y;
+        }
+        #three-container {
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0; 
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none; 
+        }
+        #dashboard-overlay {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+            pointer-events: auto;
+        }
+        #dashboard-overlay::-webkit-scrollbar { width: 6px; }
+        #dashboard-overlay::-webkit-scrollbar-track { background: rgba(31, 41, 55, 0.5); }
+        #dashboard-overlay::-webkit-scrollbar-thumb { background: rgba(75, 85, 99, 0.8); border-radius: 3px; }
+
+        .interactive-element { pointer-events: auto; transition: all 0.3s ease; }
+        .metric-card { backdrop-filter: blur(12px); background-color: rgba(30, 41, 59, 0.75); border: 1px solid rgba(75, 85, 99, 0.5); }
+        
+        .highlight-active {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 20px rgba(96, 165, 250, 0.6) !important;
+            transform: scale(1.05);
+            z-index: 50;
+            background-color: rgba(30, 41, 59, 0.95);
+        }
+
+        .chart-title { color: #93c5fd; }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .voice-active { animation: pulse-ring 2s infinite; }
+        
+        .cursor-grab { cursor: grab; cursor: -webkit-grab; }
+        .cursor-grabbing { cursor: grabbing; cursor: -webkit-grabbing; }
+
+        /* Modal for Add Patient & Add RMP */
+        .modal-backdrop { background: rgba(0,0,0,0.6); }
+        .modal-card { background: rgba(15,23,42,0.95); border: 1px solid rgba(75,85,99,0.6); }
+    </style>
+    <!-- Three.js & GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+
+    <div id="three-container"></div>
+
+    <div id="dashboard-overlay">
+        <div class="content-wrapper container mx-auto p-4 sm:p-6 max-w-7xl">
+            
+            <header id="header-section" class="interactive-element flex flex-col md:flex-row justify-between items-start md:items-center mb-6 opacity-0 translate-y-[-10px]">
+                <div class="mb-4 md:mb-0">
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-400 tracking-tight">Vaidya AI <span class="text-white">Dashboard V1</span></h1>
+                    <p class="text-xs text-gray-400 mt-1">Real-time practice analytics</p>
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+                    <blockquote class="text-xs sm:text-sm italic text-gray-300 border-l-2 border-blue-500 pl-3 max-w-xs hidden sm:block">
+                        "The art of medicine consists of amusing the patient while nature cures the disease."
+                    </blockquote>
+                    
+                    <button id="voice-tour-btn" onclick="toggleVoiceTour()" class="interactive-element flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-4 rounded-full transition-all shadow-lg" aria-pressed="false" aria-label="Start voice tour">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                        <span>Voice Tour</span>
+                    </button>
+
+                    <!-- Add Patient Button -->
+                    <button id="add-patient-btn" class="interactive-element flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-full transition-all shadow-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Add Patient</span>
+                    </button>
+
+                    <!-- Add RMP Button -->
+                    <button id="add-rmp-btn" class="interactive-element flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-4 rounded-full transition-all shadow-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c2.485 0 4.5-2.015 4.5-4.5S14.485 2 12 2 7.5 4.015 7.5 6.5 9.515 11 12 11zM3 20.5C3 17 7.03 15 12 15s9 2 9 5.5V22H3v-1.5z" />
+                        </svg>
+                        <span>Add RMP</span>
+                    </button>
+
+                    <div id="auth-container" class="flex items-center space-x-3">
+                        <div id="user-info" class="hidden items-center space-x-2 text-xs text-gray-200">
+                            <span id="user-email" class="font-medium"></span>
+                            <button id="signout-btn" class="text-xs bg-gray-700 hover:bg-gray-600 text-white py-1 px-2 rounded">Sign out</button>
+                        </div>
+
+                        <form id="auth-form" class="flex items-center space-x-2">
+                            <input id="auth-email" type="email" placeholder="email" class="text-xs p-2 rounded bg-slate-800 placeholder-gray-400" />
+                            <input id="auth-pass" type="password" placeholder="password" class="text-xs p-2 rounded bg-slate-800 placeholder-gray-400" />
+                            <button id="signin-btn" type="button" class="text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded">Sign in</button>
+                            <button id="signup-btn" type="button" class="text-xs bg-transparent border border-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded">Sign up</button>
+                        </form>
+                    </div>
+                </div>
+            </header>
+
+            <section id="metrics-section" class="interactive-element grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 opacity-0">
+                <div id="card-rmp" class="metric-card p-3 rounded-lg shadow-md">
+                    <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">RMP Doctors</p>
+                    <p class="text-xl sm:text-2xl font-bold text-green-400 mt-1" id="rmp-count">0</p>
+                </div>
+                <div id="card-engaged" class="metric-card p-3 rounded-lg shadow-md">
+                    <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Patient Engagement</p>
+                    <p class="text-xl sm:text-2xl font-bold text-yellow-400 mt-1" id="engaged-count">0</p>
+                </div>
+                <div id="card-views" class="metric-card p-3 rounded-lg shadow-md">
+                    <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Views (30d)</p>
+                    <p class="text-xl sm:text-2xl font-bold text-indigo-400 mt-1" id="views-count">0</p>
+                </div>
+                <div id="card-shares" class="metric-card p-3 rounded-lg shadow-md">
+                    <p class="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider">Shares (30d)</p>
+                    <p class="text-xl sm:text-2xl font-bold text-red-400 mt-1" id="shares-count">0</p>
+                </div>
+            </section>
+
+            <section id="chart-legend-section" class="interactive-element grid grid-cols-1 md:grid-cols-3 gap-4 opacity-0">
+                <div id="card-status" class="md:col-span-1">
+                    <h3 class="chart-title text-sm font-semibold mb-2">Patient Status (3D)</h3>
+                    <div class="metric-card p-3 rounded-lg shadow-md h-full min-h-[100px]">
+                        <p class="text-[10px] text-gray-400 mb-2">Interactive 3D Visualization below.</p>
+                        <div id="pie-legend" class="space-y-1 text-xs"></div>
+                    </div>
+                </div>
+                <div id="card-growth" class="md:col-span-1">
+                    <h3 class="chart-title text-sm font-semibold mb-2">Monthly Growth</h3>
+                    <div class="metric-card p-3 rounded-lg shadow-md h-full flex flex-col justify-center min-h-[100px]">
+                        <p class="text-[10px] text-gray-400">Reserved for Admissions Growth.</p>
+                        <div class="mt-2 h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-blue-500 w-3/4"></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="card-network" class="md:col-span-1">
+                    <h3 class="chart-title text-sm font-semibold mb-2">RMP Network</h3>
+                    <div class="metric-card p-3 rounded-lg shadow-md h-full flex flex-col justify-center min-h-[100px]">
+                        <p class="text-[10px] text-gray-400">Reserved for RMP Geospatial Data.</p>
+                        <div class="flex -space-x-2 mt-2 overflow-hidden">
+                             <div class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-800 bg-gray-500"></div>
+                             <div class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-800 bg-gray-600"></div>
+                             <div class="inline-block h-5 w-5 rounded-full ring-2 ring-slate-800 bg-gray-700"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="chart-spacer" class="h-[400px] w-full pointer-events-none"></div>
+        </div>
+    </div>
+
+    <!-- Add Patient Modal (hidden by default) -->
+    <div id="add-patient-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+      <div class="modal-card p-4 rounded-lg w-full max-w-md mx-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold">Add Patient</h3>
+          <button id="close-add-patient" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Close</button>
+        </div>
+        <form id="add-patient-form" class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-300">Full name</label>
+            <input id="patient-name" required type="text" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="Patient name" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-300">Age</label>
+              <input id="patient-age" type="number" min="0" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="Age" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-300">Gender</label>
+              <select id="patient-gender" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm">
+                <option value="">Select</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Other</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-gray-300">Status</label>
+            <select id="patient-status" required class="w-full mt-1 p-2 rounded bg-slate-800 text-sm">
+              <option value="Active">Active</option>
+              <option value="Observation">Observation</option>
+              <option value="Discharged">Discharged</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-300">Notes</label>
+            <textarea id="patient-notes" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" rows="3" placeholder="Optional notes"></textarea>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" id="add-patient-submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm py-2 px-4 rounded">Save Patient</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add RMP Modal (hidden by default) -->
+    <div id="add-rmp-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+      <div class="modal-card p-4 rounded-lg w-full max-w-md mx-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold">Add RMP Doctor</h3>
+          <button id="close-add-rmp" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">Close</button>
+        </div>
+        <form id="add-rmp-form" class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-300">Full name</label>
+            <input id="rmp-name" required type="text" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="Doctor name" />
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-300">Registration ID</label>
+              <input id="rmp-reg" type="text" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="Reg ID" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-300">Specialty</label>
+              <input id="rmp-specialty" type="text" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="Specialty" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-300">Phone</label>
+              <input id="rmp-phone" type="tel" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="Phone" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-300">Location</label>
+              <input id="rmp-location" type="text" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" placeholder="City / Area" />
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-gray-300">Notes</label>
+            <textarea id="rmp-notes" class="w-full mt-1 p-2 rounded bg-slate-800 text-sm" rows="3" placeholder="Optional notes"></textarea>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" id="add-rmp-submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm py-2 px-4 rounded">Save RMP</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script type="module">
+        // --- Firebase imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import {
+            getFirestore,
+            doc,
+            onSnapshot,
+            collection,
+            query,
+            getDocs,
+            orderBy,
+            limit,
+            setDoc,
+            addDoc,
+            updateDoc,
+            getDoc,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ---------- UPDATED Firebase config (your vidyaaai project) ----------
+        const firebaseConfig = {
+          apiKey: "AIzaSyDozLLKWzMHLC8nNnvKrZTwEgvLuCt2re0",
+          authDomain: "vidyaaai.firebaseapp.com",
+          projectId: "vidyaaai",
+          storageBucket: "vidyaaai.firebasestorage.app",
+          messagingSenderId: "920193754336",
+          appId: "1:920193754336:web:ff01c0cfe91b3b42a21c85"
+        };
+
+        // --- Fallback mock data used only until Firestore returns ---
+        let mockData = {
+            kpis: {
+                rmpCount: 0,
+                engagedPatients: 0,
+                posterViews: 0,
+                posterShares: 0,
+            },
+            patientStatus: [
+                { status: 'Active', value: 60, color: 0x10b981 },
+                { status: 'Observation', value: 25, color: 0xfacc15 },
+                { status: 'Discharged', value: 15, color: 0xef4444 },
+            ]
+        };
+
+        // (patientStatus override is applied later once normalizePatientStatusArray is available)
+
+        // --- Firebase / Firestore state ---
+        let app, auth, db;
+        let unsubKpis = null;
+        let unsubStatus = null;
+        let unsubPatients = null;
+        let unsubRmp = null; // NEW: listener for RMPs
+        let debouncedResizeHandler = null;
+
+        // --- Helper: normalize incoming patient-status arrays (counts -> percentages) ---
+        function normalizePatientStatusArray(items) {
+            // Accept several possible shapes from Firestore / UI: {value}, {count}, {val}
+            const sanitized = (Array.isArray(items) ? items.map(it => {
+                const status = String(it.status ?? it.label ?? it.name ?? "Unknown");
+                // prefer explicit numeric fields but accept alternate keys
+                const rawValue = (it.value ?? it.count ?? it.val ?? it.countValue ?? 0);
+                const value = Number(rawValue || 0);
+                // color may be numeric or a hex string like '#ff0000'
+                let color = it.color ?? it.col ?? it.hexColor ?? 0x999999;
+                if (typeof color === 'string') {
+                    try {
+                        color = color.replace(/^#/, '');
+                        color = Number(parseInt(color, 16));
+                    } catch (e) { color = 0x999999; }
+                } else {
+                    color = Number(color || 0x999999);
+                }
+                return { status, value, color };
+            }) : []);
+
+            const total = sanitized.reduce((s, it) => s + Math.max(0, it.value), 0);
+
+            if (total <= 0 || sanitized.length === 0) {
+                // fallback default
+                return [
+                    { status: 'Active', value: 60, color: 0x10b981 },
+                    { status: 'Observation', value: 25, color: 0xfacc15 },
+                    { status: 'Discharged', value: 15, color: 0xef4444 }
+                ];
+            }
+
+            const withPct = sanitized.map(it => ({ ...it, pct: (it.value / total) * 100 }));
+            let pctRounded = withPct.map(it => Math.round(it.pct));
+            let diff = 100 - pctRounded.reduce((a,b) => a+b, 0);
+            // distribute diff
+            for (let i = 0; diff !== 0 && i < pctRounded.length; i++) {
+                pctRounded[i] += (diff > 0) ? 1 : -1;
+                diff += (diff > 0) ? -1 : 1;
+            }
+            // return values as percentages (sum to ~100) for display and sizing
+            return withPct.map((it, i) => ({ status: it.status, value: Math.max(0, pctRounded[i]), color: it.color }));
+        }
+
+        // Check for a locally persisted override (from debug API)
+        function getPatientStatusOverride() {
+            try {
+                const stored = localStorage.getItem('patientStatusOverride');
+                if (!stored) return null;
+                const parsed = JSON.parse(stored);
+                return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Count patient statuses from a Firestore snapshot and build patientStatus array
+        function buildPatientStatusFromSnapshot(snap) {
+            const statusMap = { 'Active': 0, 'Observation': 0, 'Discharged': 0 };
+            if (snap && !snap.empty) {
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    const status = String(data.status ?? 'Unknown').trim();
+                    if (statusMap.hasOwnProperty(status)) {
+                        statusMap[status]++;
+                    }
+                });
+            }
+            // Build array with actual counts
+            const statusColors = {
+                'Active': 0x10b981,      // green
+                'Observation': 0xfacc15, // yellow
+                'Discharged': 0xef4444   // red
+            };
+            const arr = Object.keys(statusMap).map(status => ({
+                status,
+                value: statusMap[status],
+                color: statusColors[status]
+            }));
+            return arr;
+        }
+
+        async function initFirebaseAndListeners() {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Watch auth state and attach per-doctor listeners when signed in
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        console.log('User signed in:', user.uid, user.email || '(no-email)');
+                        window.currentDoctorUid = user.uid;
+                        showLoggedInUI(user);
+                        attachDoctorListeners(user.uid);
+                    } else {
+                        console.log('No user signed in — using public dashboard listeners.');
+                        window.currentDoctorUid = null;
+                        showSignedOutUI();
+                        attachPublicListeners();
+                    }
+                });
+
+            } catch (e) {
+                console.error("Firebase init failed", e);
+                applyKPIChanges();
+                applyPatientStatusChanges();
+            }
+        }
+
+        function detachListeners() {
+            if (unsubKpis) { try { unsubKpis(); } catch (e) {} unsubKpis = null; }
+            if (unsubStatus) { try { unsubStatus(); } catch (e) {} unsubStatus = null; }
+            if (unsubPatients) { try { unsubPatients(); } catch (e) {} unsubPatients = null; }
+            if (unsubRmp) { try { unsubRmp(); } catch (e) {} unsubRmp = null; }
+        }
+
+        function attachPublicListeners() {
+            detachListeners();
+            try {
+                const kpisDocRef = doc(db, "dashboard", "kpis");
+                unsubKpis = onSnapshot(kpisDocRef, (snap) => {
+                    if (snap && snap.exists()) {
+                        const data = snap.data();
+                        mockData.kpis.rmpCount = Number(data.rmpCount ?? mockData.kpis.rmpCount);
+                        mockData.kpis.engagedPatients = Number(data.engagedPatients ?? mockData.kpis.engagedPatients);
+                        mockData.kpis.posterViews = Number(data.posterViews ?? mockData.kpis.posterViews);
+                        mockData.kpis.posterShares = Number(data.posterShares ?? mockData.kpis.posterShares);
+                        applyKPIChanges();
+                    } else {
+                        applyKPIChanges();
+                    }
+                }, (err) => { console.warn('KPIs snapshot error (public):', err); applyKPIChanges(); });
+
+                const statusDocRef = doc(db, "dashboard", "patientStatus");
+                unsubStatus = onSnapshot(statusDocRef, async (snap) => {
+                    // If user provided an override locally, prefer that and apply it
+                    const override = getPatientStatusOverride();
+                    if (override) {
+                        console.log('patientStatus override present — applying local override (public listener)');
+                        mockData.patientStatus = normalizePatientStatusArray(override);
+                        applyPatientStatusChanges();
+                        return;
+                    }
+                    if (snap && snap.exists()) {
+                        const data = snap.data();
+                        if (Array.isArray(data.items)) {
+                            mockData.patientStatus = normalizePatientStatusArray(data.items);
+                            applyPatientStatusChanges();
+                            return;
+                        }
+                    }
+                    // fallback to collection
+                    try {
+                        // Try a few candidate collection paths — some projects store patient-status as a subcollection
+                        // under different document/collection layouts. We'll attempt each safely.
+                        const candidateFns = [
+                            // common: dashboard/patientStatusItems
+                            async () => await getDocs(query(collection(db, "dashboard", "patientStatusItems"), orderBy("order"), limit(50))),
+                            // alternative: dashboard -> patientStatus -> items
+                            async () => await getDocs(query(collection(db, "dashboard", "patientStatus", "items"), orderBy("order"), limit(50))),
+                            // top-level collection
+                            async () => await getDocs(query(collection(db, "patientStatusItems"), orderBy("order"), limit(50)))
+                        ];
+
+                        let snapCol = null;
+                        for (const fn of candidateFns) {
+                            try {
+                                const res = await fn();
+                                if (res && !res.empty) { snapCol = res; break; }
+                            } catch (inner) {
+                                // ignore and try next candidate
+                            }
+                        }
+
+                        if (snapCol && !snapCol.empty) {
+                            const arr = [];
+                            snapCol.forEach(d => {
+                                const data = d.data();
+                                arr.push({ status: String(data.status ?? "Unknown"), value: Number(data.value ?? 0), color: Number(data.color ?? 0x999999) });
+                            });
+                            mockData.patientStatus = normalizePatientStatusArray(arr);
+                            applyPatientStatusChanges();
+                            return;
+                        } else {
+                            applyPatientStatusChanges();
+                        }
+                    } catch (e) {
+                        console.warn("patientStatus collection read error (public):", e);
+                        applyPatientStatusChanges();
+                    }
+                }, (err) => { console.warn('patientStatus snapshot error (public):', err); applyPatientStatusChanges(); });
+
+                // Public RMP listener (top-level 'rmp' collection)
+                try {
+                    const rmpColRef = collection(db, "rmp");
+                    const rmpQuery = query(rmpColRef);
+                    unsubRmp = onSnapshot(rmpQuery, (snap) => {
+                        if (snap) {
+                            const count = snap.size;
+                            mockData.kpis.rmpCount = count;
+                            applyKPIChanges();
+                        }
+                    }, (err) => {
+                        console.warn('rmp snapshot error (public):', err);
+                    });
+                } catch (e) {
+                    console.warn('attachPublicListeners rmp error', e);
+                }
+
+            } catch (e) {
+                console.warn('attachPublicListeners error', e);
+                applyKPIChanges(); applyPatientStatusChanges();
+            }
+        }
+
+        function attachDoctorListeners(uid) {
+            detachListeners();
+            if (!uid) return attachPublicListeners();
+            try {
+                const kpisDocRef = doc(db, "doctors", uid, "dashboard", "kpis");
+                unsubKpis = onSnapshot(kpisDocRef, (snap) => {
+                    if (snap && snap.exists()) {
+                        const data = snap.data();
+                        mockData.kpis.rmpCount = Number(data.rmpCount ?? mockData.kpis.rmpCount);
+                        mockData.kpis.engagedPatients = Number(data.engagedPatients ?? mockData.kpis.engagedPatients);
+                        mockData.kpis.posterViews = Number(data.posterViews ?? mockData.kpis.posterViews);
+                        mockData.kpis.posterShares = Number(data.posterShares ?? mockData.kpis.posterShares);
+                        applyKPIChanges();
+                    } else {
+                        applyKPIChanges();
+                    }
+                }, (err) => { console.warn('KPIs snapshot error (doctor):', err); applyKPIChanges(); });
+
+                const statusDocRef = doc(db, "doctors", uid, "dashboard", "patientStatus");
+                unsubStatus = onSnapshot(statusDocRef, async (snap) => {
+                    // If user has a local override, prefer and apply it rather than using doctor-scoped Firestore
+                    const override = getPatientStatusOverride();
+                    if (override) {
+                        console.log('patientStatus override present — applying local override (doctor listener)');
+                        mockData.patientStatus = normalizePatientStatusArray(override);
+                        applyPatientStatusChanges();
+                        return;
+                    }
+                    if (snap && snap.exists()) {
+                        const data = snap.data();
+                        if (Array.isArray(data.items)) {
+                            mockData.patientStatus = normalizePatientStatusArray(data.items);
+                            applyPatientStatusChanges();
+                            return;
+                        }
+                    }
+                    // fallback to collection
+                    try {
+                        // Try several candidate collection locations for doctor-scoped patient status items.
+                        const candidateFns = [
+                            // direct subcollection under doctor: doctors/{uid}/patientStatusItems
+                            async () => await getDocs(query(collection(db, "doctors", uid, "patientStatusItems"), orderBy("order"), limit(50))),
+                            // legacy: doctors/{uid}/dashboard/patientStatusItems
+                            async () => await getDocs(query(collection(db, "doctors", uid, "dashboard", "patientStatusItems"), orderBy("order"), limit(50))),
+                            // deeper: doctors/{uid}/dashboard/patientStatus/items
+                            async () => await getDocs(query(collection(db, "doctors", uid, "dashboard", "patientStatus", "items"), orderBy("order"), limit(50))),
+                            // alternate: doctors/{uid}/patientStatus/items
+                            async () => await getDocs(query(collection(db, "doctors", uid, "patientStatus", "items"), orderBy("order"), limit(50)))
+                        ];
+
+                        let snapCol = null;
+                        for (const fn of candidateFns) {
+                            try {
+                                const res = await fn();
+                                if (res && !res.empty) { snapCol = res; break; }
+                            } catch (inner) {
+                                // ignore invalid path errors and continue
+                            }
+                        }
+
+                        if (snapCol && !snapCol.empty) {
+                            const arr = [];
+                            snapCol.forEach(d => {
+                                const data = d.data();
+                                arr.push({ status: String(data.status ?? "Unknown"), value: Number(data.value ?? 0), color: Number(data.color ?? 0x999999) });
+                            });
+                            mockData.patientStatus = normalizePatientStatusArray(arr);
+                            applyPatientStatusChanges();
+                            return;
+                        } else {
+                            applyPatientStatusChanges();
+                        }
+                    } catch (e) {
+                        console.warn("patientStatus collection read error (doctor):", e);
+                        applyPatientStatusChanges();
+                    }
+                }, (err) => { console.warn('patientStatus snapshot error (doctor):', err); applyPatientStatusChanges(); });
+
+                // Patients collection listener — derive patientStatus from actual patient records
+                const patientsColRef = collection(db, "doctors", uid, "patients");
+                const patientsQuery = query(patientsColRef, orderBy("createdAt", "desc"), limit(1000));
+                unsubPatients = onSnapshot(patientsQuery, (snap) => {
+                    if (snap) {
+                        const count = snap.size;
+                        mockData.kpis.engagedPatients = count;
+                        applyKPIChanges();
+                        
+                        // Build patientStatus array from actual patient records
+                        const statusArr = buildPatientStatusFromSnapshot(snap);
+                        mockData.patientStatus = normalizePatientStatusArray(statusArr);
+                        console.log('Patient status derived from patients collection:', mockData.patientStatus);
+                        applyPatientStatusChanges();
+                    }
+                }, (err) => {
+                    console.warn('patients snapshot error:', err);
+                });
+
+                // Doctor-scoped RMP listener (doctors/{uid}/rmpNetwork)
+                try {
+                    const rmpColRef = collection(db, "doctors", uid, "rmpNetwork");
+                    const rmpQuery = query(rmpColRef);
+                    unsubRmp = onSnapshot(rmpQuery, (snap) => {
+                        if (snap) {
+                            const count = snap.size;
+                            mockData.kpis.rmpCount = count;
+                            applyKPIChanges();
+                        }
+                    }, (err) => {
+                        console.warn('rmp snapshot error (doctor):', err);
+                    });
+                } catch (e) {
+                    console.warn('attachDoctorListeners rmp error', e);
+                }
+
+            } catch (e) {
+                console.warn('attachDoctorListeners error', e);
+                applyKPIChanges(); applyPatientStatusChanges();
+            }
+        }
+
+        // --- UI helpers for auth state ---
+        function showLoggedInUI(user) {
+            const userInfo = document.getElementById('user-info');
+            const authForm = document.getElementById('auth-form');
+            const emailSpan = document.getElementById('user-email');
+            if (userInfo) userInfo.classList.remove('hidden');
+            if (authForm) authForm.classList.add('hidden');
+            if (emailSpan) emailSpan.innerText = user.email || user.uid;
+        }
+
+        function showSignedOutUI() {
+            const userInfo = document.getElementById('user-info');
+            const authForm = document.getElementById('auth-form');
+            if (userInfo) userInfo.classList.add('hidden');
+            if (authForm) authForm.classList.remove('hidden');
+            const emailSpan = document.getElementById('user-email');
+            if (emailSpan) emailSpan.innerText = '';
+        }
+
+        // --- THREE.JS SETUP ---
+        let scene, camera, renderer, controls, doughnutGroup;
+        let currentFloatingText = null;
+        let raycaster, mouse;
+        const container = document.getElementById('three-container');
+
+        const CAM_DEFAULT_Z_DESKTOP = 24;
+        const CAM_DEFAULT_Z_MOBILE = 32;
+        const CHART_Y_DESKTOP = -6;
+        const CHART_Y_MOBILE = -8;
+        let currentChartY = CHART_Y_DESKTOP;
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+
+        function initThreeJS() {
+            scene = new THREE.Scene();
+            scene.background = null;
+
+            const aspect = Math.max(1, container.clientWidth / container.clientHeight);
+            camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+
+            // --- Important default camera position so doughnut is visible immediately
+            camera.position.set(0, 0, (window.innerWidth < 768) ? CAM_DEFAULT_Z_MOBILE : CAM_DEFAULT_Z_DESKTOP);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(10, 10, 20);
+            scene.add(dirLight);
+            const blueLight = new THREE.PointLight(0x3b82f6, 0.5);
+            blueLight.position.set(-10, -5, 10);
+            scene.add(blueLight);
+
+            doughnutGroup = createPatientStatusDoughnut(mockData.patientStatus);
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            window.addEventListener('mousemove', onMouseMove, false);
+            window.addEventListener('mousedown', onMouseDown, false);
+            window.addEventListener('mouseup', onMouseUp, false);
+            window.addEventListener('touchstart', onTouchStart, { passive: false });
+            window.addEventListener('touchmove', onTouchMove, { passive: false });
+            window.addEventListener('touchend', onMouseUp, false);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enabled = false;
+            controls.enableZoom = false;
+            controls.enablePan = false;
+            controls.enableRotate = false;
+
+            debouncedResizeHandler = debounce(onWindowResize, 120);
+            window.addEventListener('resize', debouncedResizeHandler, false);
+            onWindowResize();
+            animate();
+        }
+
+        // --- 3D TEXT SPRITE ---
+        function createTextSprite(message, colorHex) {
+            const fontFace = 'Inter, sans-serif';
+            const fontSize = 70;
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = 768;
+            canvas.height = 256;
+
+            context.font = `bold ${fontSize}px ${fontFace}`;
+            context.fillStyle = typeof colorHex === 'number' ? '#' + colorHex.toString(16).padStart(6, '0') : colorHex;
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.shadowColor = "rgba(0, 0, 0, 0.9)";
+            context.shadowBlur = 8;
+            context.shadowOffsetX = 4;
+            context.shadowOffsetY = 4;
+
+            try {
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => {
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+                        context.font = `bold ${fontSize}px ${fontFace}`;
+                        context.fillText(message, canvas.width / 2, canvas.height / 2);
+                    }).catch(() => {
+                        context.fillText(message, canvas.width / 2, canvas.height / 2);
+                    });
+                } else {
+                    context.fillText(message, canvas.width / 2, canvas.height / 2);
+                }
+            } catch (e) {
+                context.fillText(message, canvas.width / 2, canvas.height / 2);
+            }
+
+            // ensure at least one draw
+            context.fillText(message, canvas.width / 2, canvas.height / 2);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(20, 7.5, 1);
+            return sprite;
+        }
+
+        function showFloatingText(text, color) {
+            if (currentFloatingText) {
+                const oldText = currentFloatingText;
+                gsap.to(oldText.material, { opacity: 0, duration: 0.3, onComplete: () => {
+                    if (oldText.material.map) oldText.material.map.dispose();
+                    if (oldText.material) oldText.material.dispose();
+                    scene.remove(oldText);
+                }});
+            }
+
+            const sprite = createTextSprite(text, color);
+            const isMobile = window.innerWidth < 768;
+            const baseY = isMobile ? -1 : 1;
+
+            sprite.position.set(0, baseY, 0);
+            sprite.material.opacity = 0;
+
+            scene.add(sprite);
+            currentFloatingText = sprite;
+
+            gsap.to(sprite.position, { y: baseY + 2, duration: 0.8, ease: "back.out" });
+            gsap.to(sprite.material, { opacity: 1, duration: 0.5 });
+        }
+
+        function hideFloatingText() {
+            if (currentFloatingText) {
+                gsap.to(currentFloatingText.material, { opacity: 0, duration: 0.5, onComplete: () => {
+                    if (currentFloatingText.material.map) currentFloatingText.material.map.dispose();
+                    if (currentFloatingText.material) currentFloatingText.material.dispose();
+                    scene.remove(currentFloatingText);
+                    currentFloatingText = null;
+                }});
+            }
+        }
+
+        // --- POINTER NORMALIZATION / INTERACTIONS ---
+        function getNormalizedCoordinates(clientX, clientY) {
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
+        function checkIntersection() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = doughnutGroup ?   raycaster.intersectObjects(doughnutGroup.children) : [];
+            return intersects.length > 0;
+        }
+
+        function onMouseDown(e) {
+            getNormalizedCoordinates(e.clientX, e.clientY);
+            if (checkIntersection()) {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+                document.body.style.cursor = 'grabbing';
+            }
+        }
+
+        function onMouseMove(e) {
+            getNormalizedCoordinates(e.clientX, e.clientY);
+            if (isDragging) {
+                const deltaMove = { x: e.clientX - previousMousePosition.x, y: e.clientY - previousMousePosition.y };
+                if (doughnutGroup) {
+                    doughnutGroup.rotation.y += deltaMove.x * 0.005;
+                    doughnutGroup.rotation.x += deltaMove.y * 0.005;
+                }
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            } else {
+                document.body.style.cursor = checkIntersection() ? 'grab' : 'default';
+            }
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            document.body.style.cursor = 'default';
+        }
+
+        function onTouchStart(e) {
+            if (e.touches.length === 1) {
+                getNormalizedCoordinates(e.touches[0].clientX, e.touches[0].clientY);
+                if (checkIntersection()) {
+                    isDragging = true;
+                    previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    e.preventDefault();
+                }
+            }
+        }
+
+        function onTouchMove(e) {
+            if (isDragging && e.touches.length === 1) {
+                e.preventDefault();
+                const deltaMove = { x: e.touches[0].clientX - previousMousePosition.x, y: e.touches[0].clientY - previousMousePosition.y };
+                if (doughnutGroup) { 
+                    doughnutGroup.rotation.y += deltaMove.x * 0.005;
+                    doughnutGroup.rotation.x += deltaMove.y * 0.005;
+                }
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+        }
+
+        // --- DOUGHNUT CREATION (defensive) ---
+        function createDoughnutSegment(startAngle, endAngle, color, index) {
+            const outerR = 6;
+            const height = 1.5;
+            const geometry = new THREE.CylinderGeometry(outerR, outerR, height, 64, 1, false, startAngle, endAngle - startAngle);
+            const material = new THREE.MeshPhongMaterial({ color: color, shininess: 80 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.rotation.x = Math.PI / 2;
+            return mesh;
+        }
+
+        function createPatientStatusDoughnut(data) {
+            // Defensive defaults
+            if (!Array.isArray(data) || data.length === 0) {
+                data = [
+                    { status: 'Active', value: 60, color: 0x10b981 },
+                    { status: 'Observation', value: 25, color: 0xfacc15 },
+                    { status: 'Discharged', value: 15, color: 0xef4444 }
+                ];
+            }
+
+            if (doughnutGroup) {
+                scene.remove(doughnutGroup);
+                doughnutGroup.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+
+            const total = data.reduce((sum, item) => sum + (Number(item.value) || 0), 0) || 1;
+            let currentAngle = 0;
+            const group = new THREE.Group();
+            data.forEach((item, index) => { 
+                const angle = (Number(item.value) / total) * Math.PI * 2;
+                const segment = createDoughnutSegment(currentAngle, currentAngle + angle, item.color, index);
+                const centerAngle = currentAngle + angle / 2;
+                const offsetX = Math.cos(centerAngle) * 0.3;
+                const offsetZ = Math.sin(centerAngle) * 0.3;
+
+                segment.position.set(0, 0, 0);
+                segment.userData = { 
+                    baseX: offsetX,
+                    baseY: offsetZ,
+                    baseZ: index * 0.1,
+                    randomPhase: Math.random() * Math.PI * 2
+                };
+                gsap.to(segment.position, { x: offsetX, y: offsetZ, z: index * 0.1, duration: 1.5, ease: "back.out(1.7)", delay: 1 + index * 0.2 });
+                group.add(segment);
+                currentAngle += angle;
+            });
+            group.rotation.x = 0.6; 
+            group.rotation.y = 0.4;
+            doughnutGroup = group;
+            scene.add(doughnutGroup);
+            onWindowResize();
+            return doughnutGroup;
+        }
+
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera.aspect = width / Math.max(1, height);
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            const isMobile = width < 768;
+            if (doughnutGroup) {
+                if (isMobile) {
+                    currentChartY = CHART_Y_MOBILE;
+                    doughnutGroup.position.set(0, CHART_Y_MOBILE, 0);
+                    if (!window.isZoomed) camera.position.set(0, 0, CAM_DEFAULT_Z_MOBILE);
+                } else {
+                    currentChartY = CHART_Y_DESKTOP; 
+                    doughnutGroup.position.set(0, CHART_Y_DESKTOP, 0);
+                    if (!window.isZoomed) camera.position.set(0, 0, CAM_DEFAULT_Z_DESKTOP);
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+
+            if (doughnutGroup) {
+                if(!window.isZoomed && !isDragging) {
+                    doughnutGroup.rotation.y += 0.002;
+                }
+                const time = Date.now() * 0.001;
+                doughnutGroup.children.forEach(child => {
+                    if (child.userData) {
+                        child.position.z = child.userData.baseZ + Math.sin(time + child.userData.randomPhase) * 0.1;
+                    }
+                });
+            }
+            renderer.render(scene, camera);
+        }
+
+        // --- DOM POPULATION & UI UPDATE HELPERS ---
+        function populateLegends() {
+            const pieLegend = document.getElementById('pie-legend');
+            pieLegend.innerHTML = '';
+            mockData.patientStatus.forEach(item => {
+                const colorHex = '#' + item.color.toString(16).padStart(6, '0');
+                const element = document.createElement('div');
+                element.className = 'flex items-center justify-between border-b border-gray-700 pb-1 last:border-0';
+                element.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full" style="background-color: ${colorHex}"></span>
+                        <span class="text-gray-300 font-medium">${escapeHtml(item.status)}</span>
+                    </div>
+                    <span class="font-bold text-white">${item.value}%</span>
+                `;
+                pieLegend.appendChild(element);
+            });
+        }
+
+        function escapeHtml(unsafe) {
+            return String(unsafe)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+        }
+
+        // Safe numeric animation using GSAP object
+        function animateNumber(selector, toVal, duration = 1.5) {
+            const el = document.querySelector(selector);
+            if (!el) return;
+            const obj = { val: Number(el.innerText.replace(/,/g,'')) || 0 };
+            gsap.to(obj, {
+                val: toVal,
+                duration,
+                ease: "power1.out",
+                onUpdate: () => el.innerText = Math.round(obj.val).toLocaleString()
+            });
+        }
+
+        function applyKPIChanges() {
+            const kpis = mockData.kpis;
+            animateNumber("#rmp-count", kpis.rmpCount);
+            animateNumber("#engaged-count", kpis.engagedPatients);
+            animateNumber("#views-count", kpis.posterViews);
+            animateNumber("#shares-count", kpis.posterShares);
+        }
+
+        function applyPatientStatusChanges() {
+            console.log('applyPatientStatusChanges -> patientStatus:', mockData.patientStatus);
+            populateLegends();
+            createPatientStatusDoughnut(mockData.patientStatus);
+        }
+
+        // --- VOICE TOUR ENGINE (preserve UI behavior) ---
+        window.isSpeaking = false;
+        window.isZoomed = false;
+
+        const TOUR_STEPS = [
+            { text: "Welcome to Vaidya AI Dashboard V1. Let's review your real-time practice metrics.", target: null },
+            { text: () => `You currently have ${mockData.kpis.rmpCount} Associated RMP Doctors in your network.`, target: "card-rmp" },
+            { text: () => `Patient engagement is strong, with ${mockData.kpis.engagedPatients} active patients.`, target: "card-engaged" },
+            { text: () => `Your outreach posters have been viewed ${mockData.kpis.posterViews} times in the last 30 days.`, target: "card-views" },
+            { text: () => `And shared ${mockData.kpis.posterShares} times.`, target: "card-shares" },
+            { text: "Now, let's examine the Patient Status breakdown in the 3D chart below.", target: "card-status", action: "scroll_to_chart" },
+            { text: () => `Looking at the data, Active patients make up ${mockData.patientStatus[0]?.value ?? 0}% of the total.`, target: "card-status", dataIndex: 0 },
+            { text: () => `Observation cases currently stand at ${mockData.patientStatus[1]?.value ?? 0}%.`, target: "card-status", dataIndex: 1 },
+            { text: () => `And Discharged patients account for ${mockData.patientStatus[2]?.value ?? 0}%.`, target: "card-status", dataIndex: 2 },
+            { text: "You can rotate this chart manually to view it from different angles. This concludes the tour.", target: null, action: "reset" }
+        ];
+
+        // voice handling: cache voices
+        let availableVoices = [];
+        if (window.speechSynthesis) {
+            availableVoices = window.speechSynthesis.getVoices();
+            window.speechSynthesis.onvoiceschanged = () => {
+                availableVoices = window.speechSynthesis.getVoices();
+            };
+        }
+
+        window.toggleVoiceTour = function() {
+            const btn = document.getElementById('voice-tour-btn');
+
+            if (window.isSpeaking) {
+                window.speechSynthesis.cancel();
+                window.isSpeaking = false;
+                btn.classList.remove('voice-active');
+                btn.querySelector('span').innerText = "Voice Tour";
+                btn.setAttribute('aria-pressed', 'false');
+                resetHighlights();
+                hideFloatingText();
+                return;
+            }
+
+            window.isSpeaking = true;
+            btn.classList.add('voice-active');
+            btn.querySelector('span').innerText = "Stop Tour";
+            btn.setAttribute('aria-pressed', 'true');
+            playStep(0);
+        };
+
+        function scrollToElementInOverlay(elId) {
+            const overlay = document.getElementById('dashboard-overlay');
+            const el = document.getElementById(elId);
+            if (!el || !overlay) return;
+            const top = el.offsetTop;
+            overlay.scrollTo({ top: Math.max(0, top - 24), behavior: 'smooth' });
+        }
+
+        function playStep(index) {
+            if (!window.isSpeaking || index >= TOUR_STEPS.length) {
+                const btn = document.getElementById('voice-tour-btn');
+                if (btn && window.isSpeaking) toggleVoiceTour();
+                return;
+            }
+            const step = TOUR_STEPS[index];
+
+            resetHighlights();
+            if (step.target) {
+                const el = document.getElementById(step.target);
+                if (el) el.classList.add('highlight-active');
+            }
+
+            if (step.action === "scroll_to_chart") {
+                scrollToElementInOverlay('card-status');
+            }
+
+            if (step.action === "reset") {
+                hideFloatingText();
+                const overlay = document.getElementById('dashboard-overlay');
+                overlay.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            if (step.dataIndex !== undefined) {
+                const dataItem = mockData.patientStatus[step.dataIndex];
+                if (dataItem) showFloatingText(`${dataItem.status}: ${dataItem.value}%`, dataItem.color);
+            }
+
+            const utterText = (typeof step.text === 'function') ? step.text() : step.text;
+            const utterance = new SpeechSynthesisUtterance(utterText);
+            utterance.rate = 1.0;
+            const voice = (availableVoices && availableVoices.length) ? (availableVoices.find(v => v.name.includes('Google US English')) || availableVoices.find(v => v.lang && v.lang.startsWith('en'))) : null;
+            if (voice) utterance.voice = voice;
+
+            utterance.onend = () => {
+                if (window.isSpeaking) {
+                    setTimeout(() => playStep(index + 1), 300);
+                }
+            };
+
+            try {
+                window.speechSynthesis.speak(utterance);
+            } catch (e) {
+                console.warn("Speech error:", e);
+                setTimeout(() => playStep(index + 1), 800);
+            }
+        }
+
+        function resetHighlights() {
+            document.querySelectorAll('.highlight-active').forEach(el => el.classList.remove('highlight-active'));
+        }
+
+        // --- Lifecycle cleanup ---
+        function cleanup() {
+            try {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mousedown', onMouseDown);
+                window.removeEventListener('mouseup', onMouseUp);
+                window.removeEventListener('touchstart', onTouchStart);
+                window.removeEventListener('touchmove', onTouchMove);
+                window.removeEventListener('touchend', onMouseUp);
+                if (debouncedResizeHandler) window.removeEventListener('resize', debouncedResizeHandler, false);
+
+                detachListeners();
+
+                if (renderer) {
+                    renderer.dispose();
+                    if (renderer.domElement && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+                }
+
+                if (scene) {
+                    scene.traverse(obj => {
+                        if (obj.geometry) try { obj.geometry.dispose(); } catch (e) {}
+                        if (obj.material) {
+                            try {
+                                if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                                else obj.material.dispose();
+                            } catch (e) {}
+                        }
+                        if (obj.material && obj.material.map) try { obj.material.map.dispose(); } catch (e) {}
+                    });
+                }
+            } catch (e) {
+                console.warn("Cleanup error", e);
+            }
+        }
+
+        window.addEventListener('beforeunload', cleanup);
+
+        // --- Utils ---
+        function debounce(fn, wait) {
+            let t;
+            return function(...args) {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(this, args), wait);
+            }
+        }
+
+        // --- Add Patient form logic ---
+        const addPatientBtn = document.getElementById('add-patient-btn');
+        const addPatientModal = document.getElementById('add-patient-modal');
+        const closeAddPatient = document.getElementById('close-add-patient');
+        const addPatientForm = document.getElementById('add-patient-form');
+
+        if (addPatientBtn) addPatientBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            addPatientModal.classList.remove('hidden');
+            addPatientModal.classList.add('flex');
+        });
+        if (closeAddPatient) closeAddPatient.addEventListener('click', () => {
+            addPatientModal.classList.add('hidden');
+            addPatientModal.classList.remove('flex');
+            addPatientForm.reset();
+        });
+
+        async function savePatientToFirestore(patientObj) {
+            if (!db) throw new Error('Firestore not initialized');
+            if (!window.currentDoctorUid) throw new Error('Sign in required to save patients (this saves under your doctor profile).');
+
+            // include doctorId for clarity and future querying
+            const payload = {
+                ...patientObj,
+                doctorId: window.currentDoctorUid,
+                createdBy: window.currentDoctorUid,
+                createdAt: serverTimestamp()
+            };
+
+            const colRef = collection(db, 'doctors', window.currentDoctorUid, 'patients');
+            const docRef = await addDoc(colRef, payload);
+            return docRef;
+        }
+
+        if (addPatientForm) {
+            addPatientForm.addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const name = document.getElementById('patient-name').value.trim();
+                const ageVal = document.getElementById('patient-age').value;
+                const age = ageVal ? Number(ageVal) : null;
+                const gender = document.getElementById('patient-gender').value || 'unknown';
+                const status = document.getElementById('patient-status').value;
+                const notes = document.getElementById('patient-notes').value.trim();
+
+                if (!name) return alert('Please enter patient name');
+                if (!status) return alert('Please select status');
+
+                if (!window.currentDoctorUid) {
+                    alert('You must sign in to save patients. Please sign in or sign up using the form.');
+                    return;
+                }
+
+                const patient = { name, age, gender, status, notes };
+
+                try {
+                    await savePatientToFirestore(patient);
+                    alert('Patient saved');
+                    addPatientModal.classList.add('hidden');
+                    addPatientModal.classList.remove('flex');
+                    addPatientForm.reset();
+                } catch (e) {
+                    console.error('Failed to save patient', e);
+                    alert('Failed to save patient: ' + (e.message || e));
+                }
+            });
+        }
+
+        // --- Add RMP form logic (NEW) ---
+        const addRmpBtn = document.getElementById('add-rmp-btn');
+        const addRmpModal = document.getElementById('add-rmp-modal');
+        const closeAddRmp = document.getElementById('close-add-rmp');
+        const addRmpForm = document.getElementById('add-rmp-form');
+
+        if (addRmpBtn) addRmpBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            addRmpModal.classList.remove('hidden');
+            addRmpModal.classList.add('flex');
+        });
+        if (closeAddRmp) closeAddRmp.addEventListener('click', () => {
+            addRmpModal.classList.add('hidden');
+            addRmpModal.classList.remove('flex');
+            addRmpForm.reset();
+        });
+
+        // Save RMP to Firestore: per-doctor network if signed in; otherwise top-level 'rmp'
+        async function saveRmpToFirestore(rmpObj) {
+            if (!db) throw new Error('Firestore not initialized');
+
+            const payload = {
+                ...rmpObj,
+                createdAt: serverTimestamp(),
+                createdBy: window.currentDoctorUid || null,
+                doctorId: window.currentDoctorUid || null
+            };
+
+            if (window.currentDoctorUid) {
+                const colRef = collection(db, 'doctors', window.currentDoctorUid, 'rmpNetwork');
+                const docRef = await addDoc(colRef, payload);
+                return docRef;
+            } else {
+                // fallback to global rmp collection
+                const colRef = collection(db, 'rmp');
+                const docRef = await addDoc(colRef, payload);
+                return docRef;
+            }
+        }
+
+        if (addRmpForm) {
+            addRmpForm.addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const name = document.getElementById('rmp-name').value.trim();
+                const regId = document.getElementById('rmp-reg').value.trim();
+                const specialty = document.getElementById('rmp-specialty').value.trim();
+                const phone = document.getElementById('rmp-phone').value.trim();
+                const location = document.getElementById('rmp-location').value.trim();
+                const notes = document.getElementById('rmp-notes').value.trim();
+
+                if (!name) return alert('Please enter RMP name');
+
+                const rmp = { name, regId, specialty, phone, location, notes };
+
+                try {
+                    await saveRmpToFirestore(rmp);
+                    alert('RMP saved');
+                    addRmpModal.classList.add('hidden');
+                    addRmpModal.classList.remove('flex');
+                    addRmpForm.reset();
+                    // If listener attached, KPI will update automatically via snapshot
+                } catch (e) {
+                    console.error('Failed to save RMP', e);
+                    alert('Failed to save RMP: ' + (e.message || e));
+                }
+            });
+        }
+
+        // --- Boot sequence: initialize everything ---
+        window.onload = async function() {
+            initThreeJS();
+            populateLegends();
+            applyKPIChanges();
+            await initFirebaseAndListeners();
+
+            gsap.timeline()
+                .to("#header-section", { opacity: 1, y: 0, duration: 0.8 })
+                .to("#metrics-section", { opacity: 1, duration: 0.8 }, "-=0.4")
+                .to("#chart-legend-section", { opacity: 1, duration: 0.8 }, "-=0.4")
+                .to("#three-container", { opacity: 1, duration: 1 }, "-=0.8");
+
+            if (window.speechSynthesis) {
+                availableVoices = window.speechSynthesis.getVoices();
+                window.speechSynthesis.onvoiceschanged = () => {
+                    availableVoices = window.speechSynthesis.getVoices();
+                };
+            }
+
+            // Wire auth form buttons
+            const signinBtn = document.getElementById('signin-btn');
+            const signupBtn = document.getElementById('signup-btn');
+            const signoutBtn = document.getElementById('signout-btn');
+            const authEmail = document.getElementById('auth-email');
+            const authPass = document.getElementById('auth-pass');
+
+            if (signinBtn) signinBtn.addEventListener('click', async () => {
+                const email = (authEmail.value || '').trim();
+                const pass = authPass.value || '';
+                if (!email || !pass) return alert('Enter email and password');
+                try {
+                    // use initialized auth instance
+                    await signInWithEmailAndPassword(auth, email, pass);
+                } catch (e) {
+                    console.error('Sign-in failed', e);
+                    alert('Sign-in failed: ' + (e.message || e));
+                }
+            });
+
+            if (signupBtn) signupBtn.addEventListener('click', async () => {
+                const email = (authEmail.value || '').trim();
+                const pass = authPass.value || '';
+                if (!email || !pass) return alert('Enter email and password');
+                if (pass.length < 6) return alert('Password must be at least 6 characters');
+                try {
+                    // use initialized auth instance
+                    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                    try {
+                        const uid = cred.user.uid;
+                        const profile = {
+                            email,
+                            username: String(email).split('@')[0],
+                            role: 'doctor',
+                            createdAt: new Date().toISOString()
+                        };
+                        // use initialized db instance
+                        await setDoc(doc(db, 'doctors', uid), { profile }, { merge: true });
+                    } catch (writeErr) {
+                        console.warn('Failed to write profile after signup:', writeErr);
+                    }
+                    alert('Sign-up successful.');
+                } catch (e) {
+                    console.error('Sign-up failed', e);
+                    alert('Sign-up failed: ' + (e.message || e));
+                }
+            });
+
+            if (signoutBtn) signoutBtn.addEventListener('click', async () => {
+                try { await signOut(auth); } catch (e) { console.warn('Sign out failed', e); }
+            });
+
+            // Expose debug helpers
+            window.__VAIDYA = window.__VAIDYA || {};
+            Object.assign(window.__VAIDYA, {
+                getMockData: () => mockData,
+                updateMockData: (d) => { mockData = { ...mockData, ...d }; applyKPIChanges(); applyPatientStatusChanges(); },
+                // Persist patientStatus you add via the debug API so it becomes the source of truth locally
+                setPatientStatus: (arr) => {
+                    try {
+                        if (!Array.isArray(arr)) throw new Error('Expected array');
+                        localStorage.setItem('patientStatusOverride', JSON.stringify(arr));
+                        mockData.patientStatus = normalizePatientStatusArray(arr);
+                        applyPatientStatusChanges();
+                        console.log('Patient status override applied:', mockData.patientStatus);
+                    } catch (e) {
+                        console.error('setPatientStatus failed', e);
+                    }
+                },
+                savePatientToFirestore: savePatientToFirestore,
+                saveRmpToFirestore: saveRmpToFirestore
+            });
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaidya AI – Troubleshooting Guide</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body {
+            background-color: #0E1C2A;  /* Deep navy color from your image */
+        }
+    </style>
+</head>
+
+<body class="text-gray-200">
+
+    <!-- Header -->
+    <header class="py-6 shadow-lg" style="background-color: #132435;">
+        <h1 class="text-center text-3xl font-bold text-white">Vaidya AI – Troubleshooting Guide</h1>
+        <p class="text-center text-sm mt-1 opacity-80">Quick solutions for common issues</p>
+    </header>
+
+    <!-- Container -->
+    <div class="max-w-5xl mx-auto mt-10 p-6">
+
+        <!-- Search Box -->
+        <div class="mb-6">
+            <input 
+                id="searchInput"
+                type="text"
+                placeholder="Search a problem..."
+                class="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200
+                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onkeyup="filterProblems()"
+            >
+        </div>
+
+        <!-- Troubleshooting Table -->
+        <div class="shadow-lg rounded-lg overflow-hidden border border-gray-700" 
+             style="background-color:#152638;">
+            <table class="w-full border-collapse">
+                <thead style="background-color:#1f3550;" class="text-white">
+                    <tr>
+                        <th class="p-4 text-left">Problem</th>
+                        <th class="p-4 text-left">Solution</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="text-gray-200">
+
+                    <tr class="border-b border-gray-700 hover:bg-gray-800 bg-opacity-40">
+                        <td class="p-4 font-semibold">Dashboard graphs are not loading.</td>
+                        <td class="p-4">Check your internet connection. Pull down on the screen to refresh the dashboard.</td>
+                    </tr>
+
+                    <tr class="border-b border-gray-700 hover:bg-gray-800 bg-opacity-40">
+                        <td class="p-4 font-semibold">V-Code command not working.</td>
+                        <td class="p-4">Speak clearly (e.g., “Vee One,” not “V one”). V-codes work best from the main dashboard screen.</td>
+                    </tr>
+
+                    <tr class="border-b border-gray-700 hover:bg-gray-800 bg-opacity-40">
+                        <td class="p-4 font-semibold">Patient or RMP name not recognized.</td>
+                        <td class="p-4">Speak the name exactly as registered. Reduce background noise. You can also manually tap the name on the screen.</td>
+                    </tr>
+
+                    <tr class="border-b border-gray-700 hover:bg-gray-800 bg-opacity-40">
+                        <td class="p-4 font-semibold">Call does not go through.</td>
+                        <td class="p-4">Ensure Vaidya AI has permission to “Make and manage phone calls” in phone settings.</td>
+                    </tr>
+
+                    <tr class="hover:bg-gray-800 bg-opacity-40">
+                        <td class="p-4 font-semibold">Voice-to-text messaging is inaccurate.</td>
+                        <td class="p-4">Speak moderately in a quiet place. Poor internet can also affect transcription quality.</td>
+                    </tr>
+
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- JavaScript for Search -->
+    <script>
+        function filterProblems() {
+            const input = document.getElementById("searchInput").value.toLowerCase();
+            const rows = document.querySelectorAll("#tableBody tr");
+
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(input) ? "" : "none";
+            });
+        }
+    </script>
+
+</body>
+</html>

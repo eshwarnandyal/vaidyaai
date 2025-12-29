@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaidya Cardiac Pulse Identity</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Load GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden; 
+        }
+        #logo-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            /* Modern medical background: Deep blue/black */
+            background: linear-gradient(135deg, #020b18, #05162b); 
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #title-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            pointer-events: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="logo-container">
+    <div id="title-overlay" class="p-4 rounded-xl">
+        <h1 class="text-white text-6xl sm:text-7xl lg:text-9xl font-extrabold tracking-widest uppercase mb-2 shadow-2xl" style="text-shadow: 0 0 18px rgba(100, 180, 255, 0.9);">
+            VAIDYA
+        </h1>
+        <p class="text-blue-400 text-sm sm:text-base md:text-lg font-light tracking-wider">
+            Advanced AI for Modern Healthcare
+        </p>
+    </div>
+    <canvas id="logoCanvas"></canvas>
+</div>
+
+<script>
+    // --- Global Variables ---
+    let scene, camera, renderer, controls, group;
+    let heartMesh;
+    let container = document.getElementById('logo-container');
+    const canvas = document.getElementById('logoCanvas');
+
+    const PULSE_POINTS = 100;
+    
+    // Define properties for multiple pulse lines
+    const PULSE_LINES = [
+        // Red Line (Primary Cardiac Pulse)
+        { color: 0xff4444, zOffset: -0.5, flowSpeed: 5.0, amplitude: 0.5, mesh: null, geometry: null, positions: new Float32Array(PULSE_POINTS * 3) }, 
+        // Green Line (Secondary Vital Sign, e.g., Respiration)
+        { color: 0x44ff44, zOffset: -0.3, flowSpeed: 3.5, amplitude: 0.3, mesh: null, geometry: null, positions: new Float32Array(PULSE_POINTS * 3) } 
+    ];
+
+    // --- Utility Functions ---
+
+    /**
+     * Creates and initializes all dynamic pulse waveform geometries.
+     */
+    function createPulseLines() {
+        PULSE_LINES.forEach(line => {
+            line.geometry = new THREE.BufferGeometry();
+            line.geometry.setAttribute('position', new THREE.BufferAttribute(line.positions, 3));
+
+            const material = new THREE.LineBasicMaterial({
+                color: line.color,
+                linewidth: 5,
+                transparent: true,
+                opacity: 1.0,
+                blending: THREE.AdditiveBlending 
+            });
+
+            // Initialize points in a straight line
+            for (let i = 0; i < PULSE_POINTS; i++) {
+                const x = (i / (PULSE_POINTS - 1)) * 6 - 3; // Span from -3 to 3 on X
+                line.positions[i * 3 + 0] = x;
+                line.positions[i * 3 + 1] = 0;
+                line.positions[i * 3 + 2] = 0;
+            }
+
+            line.mesh = new THREE.Line(line.geometry, material);
+            line.mesh.position.z = line.zOffset; 
+            group.add(line.mesh);
+        });
+    }
+
+    /**
+     * Updates the vertices of all pulse lines to simulate flowing, live readings.
+     */
+    function updatePulseLines(time) {
+        PULSE_LINES.forEach((line, index) => {
+            const frequency = 5; 
+            const flowSpeed = line.flowSpeed;
+            const amplitude = line.amplitude;
+
+            for (let i = 0; i < PULSE_POINTS; i++) {
+                const positions = line.positions;
+                const positionTime = (i / PULSE_POINTS) * frequency - (time * flowSpeed);
+                
+                let pulseY = 0;
+                
+                // 1. Core Sine Wave (smooth base)
+                pulseY += Math.sin(positionTime) * amplitude * 0.15;
+                
+                // 2. Simulated Heartbeat Peak (sharper, higher frequency) - Primary focus on the Red line (index 0)
+                if (index === 0) {
+                    const phase = positionTime % (Math.PI * 2);
+                    const peak = Math.max(0, Math.sin(phase * 4)) * amplitude * 0.5; 
+                    pulseY += peak;
+                } else {
+                    // Smoother, different wave for the green line
+                    pulseY += Math.sin(positionTime * 0.5) * amplitude * 0.3;
+                }
+                
+                // 3. Noise/Variability for realism
+                const noise = (Math.sin(positionTime * 15 + index) * 0.5 + 0.5) * 0.1 * amplitude;
+
+                positions[i * 3 + 1] = pulseY + noise;
+
+                // Shift the line subtly in Z (depth) for a dynamic 3D ribbon effect
+                positions[i * 3 + 2] = Math.sin((i / PULSE_POINTS) * Math.PI * 2 + time * 0.8) * 0.2; 
+            }
+            line.geometry.attributes.position.needsUpdate = true;
+        });
+    }
+    
+    /**
+     * Creates the central 3D heart symbol.
+     */
+    function createHeartLogo() {
+        const size = 0.7;
+        
+        // 1. Define the 2D heart shape. The shape extends from Y=-size to Y=1.5*size (Total height 2.5*size).
+        // Vertical center (Y=0) is at 0.25*size above the tip.
+        const shape = new THREE.Shape();
+        shape.moveTo(0, -size);
+        shape.bezierCurveTo(
+            -size * 1.5, -size * 1.5,
+            -size * 2.0, size * 0.5,
+            0, size * 1.5
+        );
+        shape.bezierCurveTo(
+            size * 2.0, size * 0.5,
+            size * 1.5, -size * 1.5,
+            0, -size
+        );
+
+        // 2. Extrude the shape to make it 3D
+        const extrudeSettings = {
+            steps: 2,
+            depth: 0.3, 
+            bevelEnabled: true,
+            bevelThickness: 0.1,
+            bevelSize: 0.05,
+            bevelOffset: 0,
+            bevelSegments: 4
+        };
+        const heartGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        
+        // 3. MeshPhysicalMaterial for high-realism metallic/glossy finish
+        const heartMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0xcc0000, 
+            metalness: 0.8,
+            roughness: 0.1, 
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.05,
+            emissive: 0x330000 
+        });
+        
+        heartMesh = new THREE.Mesh(heartGeometry, heartMaterial);
+        // Rotate to face the camera (X-Y plane becomes Y-Z plane)
+        heartMesh.rotation.y = Math.PI / 2;
+        
+        // CORRECTION: Shift heart vertically to center it around the pulse line (Y=0)
+        // Center offset: 0.25 * size (0.175)
+        const centerOffset = 0.25 * size; 
+        heartMesh.position.set(0, -centerOffset, 0); 
+        
+        group.add(heartMesh);
+    }
+
+    // --- Core 3D Setup ---
+
+    function init() {
+        // 1. Scene Setup
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x000000, 10, 50);
+
+        // 2. Camera Setup
+        const fov = 75;
+        const aspect = window.innerWidth / window.innerHeight;
+        const near = 0.1;
+        const far = 1000;
+        camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+        camera.position.z = 5;
+
+        // 3. Renderer Setup
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+
+        // 4. Lighting - Crucial for PBR realism
+        const ambientLight = new THREE.AmbientLight(0x444444, 2);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
+        directionalLight.position.set(3, 5, 5);
+        scene.add(directionalLight);
+
+        const backLight = new THREE.DirectionalLight(0x00aaff, 3);
+        backLight.position.set(-5, -5, -5);
+        scene.add(backLight);
+
+        // 5. Geometry
+        group = new THREE.Group();
+        createPulseLines(); // Create both red and green pulse lines
+        createHeartLogo(); 
+        
+        // Position the logo slightly above center for visual balance with the name overlay
+        group.position.y = 0.5; 
+
+        // Background Particle Field (unchanged)
+        const backgroundParticleGeometry = new THREE.BufferGeometry();
+        const backgroundParticleCount = 1500;
+        const bgPositions = new Float32Array(backgroundParticleCount * 3);
+        
+        for (let i = 0; i < backgroundParticleCount; i++) {
+            bgPositions[i * 3 + 0] = (Math.random() - 0.5) * 50;
+            bgPositions[i * 3 + 1] = (Math.random() - 0.5) * 50;
+            bgPositions[i * 3 + 2] = (Math.random() - 0.5) * 50;
+        }
+
+        backgroundParticleGeometry.setAttribute('position', new THREE.BufferAttribute(bgPositions, 3));
+        const backgroundParticleMaterial = new THREE.PointsMaterial({
+            size: 0.05,
+            color: 0x4488ff, 
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: 0.5
+        });
+
+        const backgroundParticles = new THREE.Points(backgroundParticleGeometry, backgroundParticleMaterial);
+        scene.add(backgroundParticles);
+
+        scene.add(group);
+        
+        // 6. Controls Setup
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 3;
+        controls.maxDistance = 15;
+        controls.autoRotate = true; 
+        controls.autoRotateSpeed = 0.5; 
+
+        // 7. Initial GSAP Animations
+        animateIntro();
+    }
+
+    // --- Animation & GSAP ---
+
+    function animateIntro() {
+        // Initial camera position animation
+        camera.position.set(0, 0, 15);
+        gsap.to(camera.position, {
+            z: 4, 
+            duration: 3,
+            ease: "power3.out"
+        });
+
+        // Initial object scaling
+        group.scale.set(0.1, 0.1, 0.1);
+        gsap.to(group.scale, {
+            x: 1, y: 1, z: 1,
+            duration: 2.5,
+            ease: "elastic.out(1, 0.5)"
+        });
+
+        // Initial reveal rotation
+        gsap.fromTo(group.rotation, 
+            { x: Math.PI * 2, y: Math.PI * 2 },
+            { x: 0, y: 0, duration: 3.5, ease: "power2.out" }
+        );
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const time = performance.now() * 0.001;
+
+        controls.update();
+
+        // 1. Update the live pulse waveform
+        updatePulseLines(time);
+        
+        // 2. Subtle heart and group rotation/movement
+        group.rotation.y += 0.002; 
+        heartMesh.rotation.z += 0.001;
+
+        renderer.render(scene, camera);
+    }
+
+    // --- Event Handlers ---
+
+    function onWindowResize() {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(width, height);
+    }
+
+    window.addEventListener('resize', onWindowResize, false);
+
+
+    // --- Initialization Check ---
+    window.onload = function() {
+        if (container.clientWidth > 0 && container.clientHeight > 0) {
+            init();
+            animate();
+        } else {
+            console.error("Logo container has no dimensions. Cannot initialize 3D.");
+        }
+    };
+
+</script>
+
+</body>
+</html>

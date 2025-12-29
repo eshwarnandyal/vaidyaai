@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaidya AI Portal</title>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto:wght@400;500&display=swap');
+        
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+        
+        /* Voice Button Gradient */
+        .btn-voice {
+            background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-voice:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -10px rgba(236, 72, 153, 0.5);
+        }
+
+        /* Glassmorphism */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+        .mic-listening::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: rgba(236, 72, 153, 0.5);
+            z-index: -1;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        @keyframes slide-up-fade {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-msg { animation: slide-up-fade 0.4s ease-out forwards; }
+
+        /* Tour Highlighting */
+        .tour-highlight {
+            border: 2px solid #FACC15 !important; /* Yellow-400 */
+            box-shadow: 0 0 20px rgba(250, 204, 21, 0.5) !important;
+            position: relative;
+            z-index: 50;
+            background-color: rgba(30, 41, 59, 0.95); /* Ensure readability */
+        }
+        
+        #tour-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); z-index: 40; display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+    <!-- Tour Overlay & Tooltip -->
+    <div id="tour-overlay"></div>
+    <div id="tour-tooltip" class="fixed hidden z-50 max-w-xs bg-gray-800 border-2 border-yellow-400 text-white p-4 rounded-xl shadow-2xl transition-all duration-300">
+        <h3 id="tour-title" class="font-bold text-yellow-400 text-lg mb-1">Title</h3>
+        <p id="tour-desc" class="text-sm text-gray-300 mb-3">Description goes here.</p>
+        <div class="flex justify-end space-x-2">
+            <button onclick="endTour()" class="text-xs text-gray-400 hover:text-white px-2 py-1">Skip</button>
+            <button onclick="nextStep()" class="text-xs bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-3 py-1 rounded">Next</button>
+        </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="flex flex-col md:flex-row h-screen w-full overflow-hidden">
+        
+        <!-- Left Side: 3D Canvas -->
+        <div id="canvas-container" class="w-full h-[35vh] md:w-1/2 md:h-full relative bg-gray-900 order-1">
+            <div class="absolute top-4 left-4 md:top-8 md:left-8 z-10">
+                <h1 class="text-lg md:text-2xl font-bold tracking-tight text-white drop-shadow-lg">
+                    Virtual<span class="text-blue-400">Health</span>
+                </h1>
+                <p class="text-gray-400 text-[10px] md:text-xs mt-0.5">Interactive 3D Assistance</p>
+            </div>
+        </div>
+
+        <!-- Right Side: Form Container -->
+        <div class="w-full h-[65vh] md:w-1/2 md:h-full bg-[#0B1120] relative order-2 flex flex-col">
+            
+            <!-- Tour Button -->
+            <div class="absolute top-4 right-4 z-20">
+                <button onclick="startTour()" class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-full text-xs text-yellow-400 transition-colors">
+                    <i class="fas fa-lightbulb"></i> Tour
+                </button>
+            </div>
+
+            <!-- Scrollable Wrapper -->
+            <div class="flex-1 overflow-y-auto relative">
+                <div class="min-h-full flex flex-col items-center justify-center p-4 md:p-8">
+                    
+                    <!-- Background Glows -->
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob pointer-events-none"></div>
+                    <div class="absolute bottom-0 left-0 w-64 h-64 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000 pointer-events-none"></div>
+
+                    <div class="w-full max-w-md z-10 space-y-4 pb-8">
+                        
+                        <!-- Header & Logo -->
+                        <div class="text-center mb-4 md:mb-6 pt-4">
+                            <div class="mx-auto w-12 h-12 md:w-16 md:h-16 bg-[#1e293b] rounded-full flex items-center justify-center mb-2 shadow-lg border border-gray-700 transition-all duration-300 relative group hover:scale-105">
+                                <div class="absolute inset-0 bg-blue-500/20 rounded-full blur-md group-hover:bg-blue-500/40 transition-all"></div>
+                                <i class="fas fa-shield-halved text-xl md:text-3xl text-blue-500 relative z-10"></i>
+                                <i class="fas fa-check text-[10px] md:text-sm text-white absolute mt-1 ml-0.5 relative z-10"></i> 
+                            </div>
+                            <h2 class="text-xl md:text-2xl font-bold text-white tracking-tight">Vaidya AI Login</h2>
+                            <p class="text-gray-400 text-xs mt-1">Professional Healthcare Platform</p>
+                        </div>
+
+                        <!-- Auth Toggle Tabs -->
+                        <div id="tour-toggle" class="grid grid-cols-2 gap-1 p-1 bg-gray-800/60 rounded-xl border border-gray-700 mb-4">
+                            <button id="tab-login" onclick="toggleAuthMode('login')" class="py-2 text-xs md:text-sm font-bold bg-blue-600 text-white rounded-lg shadow-sm transition-all">Login</button>
+                            <button id="tab-register" onclick="toggleAuthMode('register')" class="py-2 text-xs md:text-sm font-medium text-gray-400 hover:text-white transition-all">Register</button>
+                        </div>
+
+                        <!-- Role Selection -->
+                        <div id="tour-role">
+                            <label class="block text-xs md:text-sm font-medium text-gray-300 mb-2">Select Your Role <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-2 gap-3 md:gap-4">
+                                <div id="card-doctor" onclick="switchRole('doctor')" 
+                                     class="cursor-pointer glass-card p-2 md:p-3 rounded-xl border-2 border-blue-500 relative transition-all duration-300 group hover:bg-gray-800">
+                                    <div class="absolute top-2 right-2 w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                    <div class="flex flex-col items-center py-1">
+                                        <i class="fas fa-user-md text-xl md:text-2xl text-blue-400 mb-1 group-hover:scale-110 transition-transform"></i>
+                                        <span class="font-medium text-white text-xs md:text-sm">Doctor</span>
+                                    </div>
+                                </div>
+                                <div id="card-patient" onclick="switchRole('patient')" 
+                                     class="cursor-pointer glass-card p-2 md:p-3 rounded-xl border border-gray-700 hover:border-gray-500 transition-all duration-300 group hover:bg-gray-800">
+                                    <div class="flex flex-col items-center py-1">
+                                        <i class="fas fa-user-injured text-xl md:text-2xl text-gray-400 mb-1 group-hover:text-gray-200 group-hover:scale-110 transition-transform"></i>
+                                        <span class="font-medium text-gray-400 text-xs md:text-sm group-hover:text-white">Patient</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Forms Container -->
+                        <div id="tour-forms" class="min-h-[200px]">
+                            
+                            <!-- Login Form -->
+                            <form id="loginForm" class="space-y-3 md:space-y-4 animate-fade-in" onsubmit="event.preventDefault(); handleLogin();">
+                                <div>
+                                    <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">Username <span class="text-red-500">*</span></label>
+                                    <input type="text" id="login-user" class="block w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 text-white text-sm transition-all" placeholder="Enter username">
+                                </div>
+                                <div>
+                                    <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">Password <span class="text-red-500">*</span></label>
+                                    <div class="relative">
+                                        <input type="password" id="login-pass" class="block w-full px-3 py-2.5 pr-10 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 text-white text-sm transition-all" placeholder="Enter password">
+                                        <button type="button" onclick="togglePassword('login-pass', 'login-eye-icon')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200 focus:outline-none">
+                                            <i id="login-eye-icon" class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Forgot Password Link -->
+<div class="text-right -mt-2 mb-1">
+    <button type="button" onclick="openForgotPassword()" 
+        class="text-xs text-blue-400 hover:text-blue-300">
+        Forgot Password?
+    </button>
+</div>
+
+
+                                <button type="submit" class="w-full py-3 rounded-xl shadow-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 transition-transform hover:scale-[1.02]">
+                                    Login
+                                </button>
+
+                                <!-- Google Login -->
+                                <div class="relative py-1">
+                                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-700"></div></div>
+                                    <div class="relative flex justify-center text-[10px]"><span class="px-2 bg-[#0B1120] text-gray-500">OR</span></div>
+                                </div>
+                                <button type="button" class="w-full flex items-center justify-center gap-3 py-2.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition-all shadow-sm active:scale-[0.99]">
+                                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google Logo">
+                                    <span class="text-sm font-medium font-[Roboto]">Sign in with Google</span>
+                                </button>
+                            </form>
+
+                           <!-- Registration Form -->
+<form id="registerForm" class="space-y-3 md:space-y-4 hidden animate-fade-in" 
+      onsubmit="event.preventDefault(); handleRegister();">
+
+    <!-- Username -->
+    <div>
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Username <span class="text-red-500">*</span>
+        </label>
+        <input type="text" id="reg-username"
+            class="block w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 
+                   rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm"
+            placeholder="Choose a username">
+    </div>
+
+    <!-- Full Name -->
+    <div>
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Full Name <span class="text-red-500">*</span>
+        </label>
+        <input type="text" id="reg-name"
+            class="block w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 
+                   rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm"
+            placeholder="Enter Name Here">
+    </div>
+
+    <!-- Email + Verify Button -->
+    <div>
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Email Address <span class="text-red-500">*</span>
+        </label>
+
+        <div class="flex space-x-2">
+            <input type="email" id="reg-email"
+                class="block w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 
+                       rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm"
+                placeholder="Enter Email Address Here">
+
+            <button type="button"
+                onclick="sendOtp()"
+                class="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500">
+                Verify Email
+            </button>
+        </div>
+
+        <!-- OTP Input (hidden initially) -->
+        <input type="text" id="otp-box"
+            class="mt-2 w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 
+                   rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm hidden"
+            placeholder="Enter OTP">
+    </div>
+
+    <!-- Mobile Number -->
+    <div>
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Mobile Number <span class="text-red-500">*</span>
+        </label>
+        <input type="tel" id="reg-mobile"
+            class="block w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 
+                   rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm"
+            placeholder="Enter Number Here">
+    </div>
+
+    <!-- Speciality -->
+    <div>
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Speciality (if applicable)
+        </label>
+        <select id="reg-speciality" class="block w-full px-3 py-2.5 bg-gray-800/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm">
+            <option value="">-- Select Speciality --</option>
+            <option value="Cardiology">Cardiology</option>
+            <option value="Dermatology">Dermatology</option>
+            <option value="Neurology">Neurology</option>
+            <option value="Pediatrics">Pediatrics</option>
+            <option value="Orthopedics">Orthopedics</option>
+            <option value="General Medicine">General Medicine</option>
+        </select>
+    </div>
+
+    <!-- Password -->
+    <div>
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Create Password <span class="text-red-500">*</span>
+        </label>
+
+        <div class="relative">
+            <input type="password" id="reg-pass" oninput="showConfirmPassword()"
+                class="block w-full px-3 py-2.5 pr-10 bg-gray-800/50 border border-gray-700 
+                       rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm"
+                placeholder="••••••••">
+
+            <button type="button" onclick="togglePassword('reg-pass', 'reg-eye-icon')"
+                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200">
+                <i id="reg-eye-icon" class="fas fa-eye"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- CONFIRM PASSWORD (hidden first) -->
+    <div id="confirm-pass-box" class="hidden">
+        <label class="block text-xs md:text-sm font-medium text-gray-300 mb-1">
+            Confirm Password <span class="text-red-500">*</span>
+        </label>
+
+        <div class="relative">
+            <input type="password" id="reg-confirm-pass"
+                class="block w-full px-3 py-2.5 pr-10 bg-gray-800/50 border border-gray-700 
+                       rounded-lg focus:ring-2 focus:ring-purple-500 text-white text-sm"
+                placeholder="Re-enter password">
+
+            <button type="button" onclick="togglePassword('reg-confirm-pass', 'reg-eye-confirm')"
+                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200">
+                <i id="reg-eye-confirm" class="fas fa-eye"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Submit Button -->
+    <button type="submit"
+        class="w-full py-3 rounded-xl shadow-lg text-sm font-bold text-white 
+               bg-purple-600 hover:bg-purple-500 transition-transform hover:scale-[1.02]">
+        Create Account
+    </button>
+</form>
+
+
+                                <!-- Google Register -->
+                                <div class="relative py-1">
+                                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-700"></div></div>
+                                    <div class="relative flex justify-center text-[10px]"><span class="px-2 bg-[#0B1120] text-gray-500">OR</span></div>
+                                </div>
+                                <button type="button" class="w-full flex items-center justify-center gap-3 py-2.5 bg-white text-gray-600 rounded-lg hover:bg-gray-100 transition-all shadow-sm active:scale-[0.99]">
+                                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google Logo">
+                                    <span class="text-sm font-medium font-[Roboto]">Register with Google</span>
+                                </button>
+                            </form>
+
+                        </div>
+
+                        <!-- Messages Container -->
+                        <div id="message-container" class="min-h-[60px]">
+                            <!-- Success Message -->
+                            <div id="success-message" class="hidden animate-msg bg-green-900/40 border border-green-500 rounded-xl p-3">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-check-circle text-green-400 text-lg"></i>
+                                    <div>
+                                        <h3 class="text-sm font-bold text-green-400">Success!</h3>
+                                        <p id="success-text" class="text-xs text-green-200"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Error Message -->
+                            <div id="error-message" class="hidden animate-msg bg-red-900/40 border border-red-500 rounded-xl p-3">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-circle-exclamation text-red-400 text-lg"></i>
+                                    <div>
+                                        <h3 class="text-sm font-bold text-red-400">Error</h3>
+                                        <p id="error-text" class="text-xs text-red-200">Invalid details entered.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="relative py-2">
+                            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-700"></div></div>
+                            <div class="relative flex justify-center text-xs"><span class="px-2 bg-[#0B1120] text-gray-500">Or use voice commands</span></div>
+                        </div>
+
+                        <!-- Voice Action -->
+                        <button id="voice-btn" onclick="startVoiceInput()" 
+                                class="btn-voice w-full flex items-center justify-center space-x-2 py-3 rounded-xl text-white font-semibold shadow-lg relative overflow-hidden group">
+                            <i class="fas fa-microphone text-base group-hover:animate-bounce"></i>
+                            <span id="voice-status" class="text-sm">Voice Login / Register</span>
+                            <div id="voice-ripple" class="absolute inset-0 rounded-xl"></div>
+                        </button>
+
+                        <!-- Help Section -->
+                        <div id="tour-help" class="text-center">
+                            <button onclick="toggleHelp()" class="text-xs text-blue-400 hover:text-blue-300 flex items-center justify-center mx-auto gap-2 py-2">
+                                <i class="fas fa-circle-question"></i> Voice Command Help
+                            </button>
+                            
+                            <div id="help-section" class="hidden bg-gray-800/80 rounded-lg p-3 border border-gray-700 text-xs space-y-2 text-left mt-2">
+                                <div class="space-y-2">
+                                    <p class="text-blue-300 font-bold text-[10px] uppercase tracking-wider">Login</p>
+                                    <p class="text-gray-400 bg-gray-900 p-2 rounded border border-gray-700">
+                                        "Login for <span class="text-blue-400">doctor</span> username <span class="text-white">sanjay</span> password <span class="text-white">sanjay</span>"
+                                    </p>
+                                    <p class="text-purple-300 font-bold text-[10px] uppercase tracking-wider mt-2">Register</p>
+                                    <p class="text-gray-400 bg-gray-900 p-2 rounded border border-gray-700">
+                                        "Register as <span class="text-blue-400">patient</span> username <span class="text-white">john1</span> name <span class="text-white">John</span>..."
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State & Validation ---
+        let currentRole = 'doctor';
+        let authMode = 'login';
+
+        const VALID_CREDENTIALS = {
+            doctor: { user: 'sanjay', pass: 'sanjay' },
+            patient: { user: 'kalyan', pass: 'pass' }
+        };
+
+        // --- Single togglePassword implementation (avoid duplicates) ---
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (!input) return;
+            if (input.type === "password") {
+                input.type = "text";
+                if (icon) { icon.classList.remove("fa-eye"); icon.classList.add("fa-eye-slash"); }
+            } else {
+                input.type = "password";
+                if (icon) { icon.classList.remove("fa-eye-slash"); icon.classList.add("fa-eye"); }
+            }
+        }
+
+        function toggleAuthMode(mode) {
+            authMode = mode;
+            const btnLogin = document.getElementById('tab-login');
+            const btnReg = document.getElementById('tab-register');
+            const formLogin = document.getElementById('loginForm');
+            const formReg = document.getElementById('registerForm');
+            const voiceStatus = document.getElementById('voice-status');
+
+            hideMessages();
+
+            if (mode === 'login') {
+                if (btnLogin) {
+                    btnLogin.classList.replace('text-gray-400', 'text-white');
+                    btnLogin.classList.replace('font-medium', 'font-bold');
+                    btnLogin.classList.add('bg-blue-600', 'shadow-sm');
+                }
+                if (btnReg) {
+                    btnReg.classList.replace('text-white', 'text-gray-400');
+                    btnReg.classList.replace('font-bold', 'font-medium');
+                    btnReg.classList.remove('bg-purple-600', 'shadow-sm');
+                }
+                if (formLogin) formLogin.classList.remove('hidden');
+                if (formReg) formReg.classList.add('hidden');
+                if (voiceStatus) voiceStatus.innerText = "Voice Login";
+            } else {
+                if (btnReg) {
+                    btnReg.classList.replace('text-gray-400', 'text-white');
+                    btnReg.classList.replace('font-medium', 'font-bold');
+                    btnReg.classList.add('bg-purple-600', 'shadow-sm');
+                }
+                if (btnLogin) {
+                    btnLogin.classList.replace('text-white', 'text-gray-400');
+                    btnLogin.classList.replace('font-bold', 'font-medium');
+                    btnLogin.classList.remove('bg-blue-600', 'shadow-sm');
+                }
+                if (formReg) formReg.classList.remove('hidden');
+                if (formLogin) formLogin.classList.add('hidden');
+                if (voiceStatus) voiceStatus.innerText = "Voice Register";
+            }
+        }
+
+        function hideMessages() {
+            const s = document.getElementById('success-message');
+            const e = document.getElementById('error-message');
+            if (s) s.classList.add('hidden');
+            if (e) e.classList.add('hidden');
+        }
+
+        function showSuccess(msg) {
+            hideMessages();
+            const el = document.getElementById('success-message');
+            const txt = document.getElementById('success-text');
+            if (txt) txt.innerHTML = msg;
+            if (el) el.classList.remove('hidden');
+            if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+
+        function showError(msg) {
+            hideMessages();
+            const el = document.getElementById('error-message');
+            const txt = document.getElementById('error-text');
+            if (txt) txt.innerText = msg;
+            if (el) el.classList.remove('hidden');
+            if (el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+
+        // --- Form Handling (wired to Firebase if available) ---
+        async function handleLogin() {
+            const userInputEl = document.getElementById('login-user');
+            const passEl = document.getElementById('login-pass');
+            const userInput = userInputEl ? userInputEl.value.trim() : '';
+            const pass = passEl ? passEl.value.trim() : '';
+
+            hideMessages();
+            if (!userInput || !pass) { showError('Enter username and password'); return; }
+
+            // If firebase username sign-in is available, prefer that
+            if (window.firebaseSignInByUsername) {
+                try {
+                    showSuccess('Signing in...');
+                    const user = await window.firebaseSignInByUsername(userInput, pass);
+                    showSuccess(`Signed in as ${user.email || user.uid}`);
+                    // redirect handled by onAuthStateChanged; fallback:
+                    setTimeout(() => {
+                        const local = (user.email || user.uid || '').split('@')[0];
+                        const url = currentRole === 'doctor' ? `index.html?uid=${encodeURIComponent(user.uid)}&user=${encodeURIComponent(local)}&role=doctor` : `patient.html?uid=${encodeURIComponent(user.uid)}&user=${encodeURIComponent(local)}&role=patient`;
+                        window.location.href = url;
+                    }, 600);
+                    return;
+                } catch (err) {
+                    console.error('Firebase sign-in error', err);
+                    showError(err.message || 'Sign-in failed');
+                    return;
+                }
+            }
+
+            // Fallback local demo check (username-based)
+            const validUser = VALID_CREDENTIALS[currentRole].user;
+            const validPass = VALID_CREDENTIALS[currentRole].pass;
+            if (userInput === validUser && pass === validPass) {
+                showSuccess(`Welcome back, ${currentRole} <strong>${userInput}</strong>!`);
+                setTimeout(() => {
+                    let url = currentRole === 'doctor' ? `index.html?user=${encodeURIComponent(userInput)}&role=doctor` : `patient.html?user=${encodeURIComponent(userInput)}&role=patient`;
+                    window.location.href = url;
+                }, 1000);
+            } else {
+                showError("Invalid username or password for " + currentRole);
+            }
+        }
+
+        async function handleRegister() {
+            const username = (document.getElementById('reg-username') || {}).value?.trim() || '';
+            const name = (document.getElementById('reg-name') || {}).value?.trim() || '';
+            const email = (document.getElementById('reg-email') || {}).value?.trim() || '';
+            const mobile = (document.getElementById('reg-mobile') || {}).value?.trim() || '';
+            const pass = (document.getElementById('reg-pass') || {}).value?.trim() || '';
+            const speciality = (document.getElementById('reg-speciality') || {}).value?.trim() || '';
+            hideMessages();
+
+            if (!username || !name || !email || !pass) { showError('Please fill in all required fields.'); return; }
+
+            // If firebase create user is available, use it
+            if (window.firebaseCreateDoctor) {
+                try {
+                    await window.firebaseCreateDoctor({ username, name, email, mobile, password: pass, speciality });
+                    toggleAuthMode('login');
+                    const loginEmail = document.getElementById('login-user');
+                    if (loginEmail) loginEmail.value = username;
+                    showSuccess('Account created successfully — please sign in using your username and password.');
+                    return;
+                } catch (err) {
+                    console.error('Registration failed', err);
+                    showError(err.message || 'Registration failed');
+                    return;
+                }
+            }
+
+            // Fallback
+            showSuccess(`Account created for <strong>${username}</strong>!`);
+        }
+
+        // --- Voice Logic ---
+        function startVoiceInput() {
+            if (!('webkitSpeechRecognition' in window)) {
+                alert("Voice features require Chrome.");
+                return;
+            }
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.continuous = false;
+            
+            const btn = document.getElementById('voice-btn');
+            const status = document.getElementById('voice-status');
+            
+            if (btn) btn.classList.add('mic-listening');
+            if (status) status.innerText = "Listening...";
+            
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript.toLowerCase();
+                console.log("Heard:", transcript);
+                parseVoiceCommand(transcript);
+                if (btn) btn.classList.remove('mic-listening');
+            };
+            
+            recognition.onerror = () => {
+                const status = document.getElementById('voice-status');
+                if (status) status.innerText = "Try again";
+                if (btn) btn.classList.remove('mic-listening');
+            };
+
+            recognition.start();
+        }
+
+        function parseVoiceCommand(text) {
+            text = text.replace(/[.,]/g, '');
+
+            let role = currentRole;
+            if (text.includes("doctor")) role = 'doctor';
+            else if (text.includes("patient")) role = 'patient';
+
+            let mode = 'login';
+            if (text.includes("register") || text.includes("create account")) mode = 'register';
+
+            switchRole(role);
+            toggleAuthMode(mode);
+
+            const getValue = (str, key, nextKeys) => {
+                let idx = str.indexOf(key);
+                if (idx === -1) return "";
+                let content = str.substring(idx + key.length).trim();
+                let minIdx = content.length;
+                nextKeys.forEach(nk => {
+                    let ni = content.indexOf(nk);
+                    if (ni !== -1 && ni < minIdx) minIdx = ni;
+                });
+                return content.substring(0, minIdx).trim();
+            };
+
+            if (mode === 'login') {
+                let u = getValue(text, 'username', ['password']);
+                let p = getValue(text, 'password', ['username']);
+                
+                if (u) document.getElementById('login-user').value = u;
+                if (p) document.getElementById('login-pass').value = p;
+
+                if (u && p) {
+                    const vs = document.getElementById('voice-status');
+                    if (vs) vs.innerText = "Checking...";
+                    setTimeout(() => handleLogin(), 1000);
+                } else {
+                    showError("Could not hear username or password clearly.");
+                }
+            } else {
+                let u = getValue(text, 'username', ['name', 'email', 'password']);
+                let n = getValue(text, 'name', ['username', 'email', 'password']);
+                let e = getValue(text, 'email', ['username', 'name', 'password']);
+                let p = getValue(text, 'password', ['username', 'name', 'email']);
+
+                if(e) e = e.replace(/\sat\s/g, '@').replace(/\sdot\s/g, '.').replace(/\s/g, '');
+
+                if(u) document.getElementById('reg-username').value = u;
+                if(n) document.getElementById('reg-name').value = n;
+                if(e) document.getElementById('reg-email').value = e;
+                if(p) document.getElementById('reg-pass').value = p;
+
+                if (u && n && e && p) {
+                    const vs = document.getElementById('voice-status');
+                    if (vs) vs.innerText = "Registering...";
+                    setTimeout(() => handleRegister(), 1500);
+                } else {
+                    showError("Missing registration details (username, name, email, or password).");
+                }
+            }
+        }
+
+        // --- Role & 3D Logic (uses GLTF models) ---
+        function switchRole(role) {
+            if(currentRole === role) return;
+            currentRole = role;
+
+            const docCard = document.getElementById('card-doctor');
+            const patCard = document.getElementById('card-patient');
+
+            if (role === 'doctor') {
+                if (docCard) { docCard.classList.add('border-blue-500', 'border-2'); docCard.classList.remove('border-gray-700'); }
+                if (patCard) { patCard.classList.remove('border-blue-500', 'border-2'); patCard.classList.add('border-gray-700'); }
+            } else {
+                if (patCard) { patCard.classList.add('border-blue-500', 'border-2'); patCard.classList.remove('border-gray-700'); }
+                if (docCard) { docCard.classList.remove('border-blue-500', 'border-2'); docCard.classList.add('border-gray-700'); }
+            }
+
+            // Show/hide GLTF models if available
+            if (typeof doctorModel !== 'undefined' && typeof patientModel !== 'undefined') {
+                if (role === 'doctor') {
+                    if (doctorModel) doctorModel.visible = true;
+                    if (patientModel) patientModel.visible = false;
+                } else {
+                    if (doctorModel) doctorModel.visible = false;
+                    if (patientModel) patientModel.visible = true;
+                }
+            }
+        }
+
+        // --- Page Tour ---
+        const tourSteps = [
+            { id: 'tour-toggle', title: 'Login or Register', text: 'Toggle between existing login and new account creation.' },
+            { id: 'tour-role', title: 'Select Role', text: 'Choose Doctor or Patient. Watch the character spin!' },
+            { id: 'tour-forms', title: 'Enter Details', text: 'Fill in your credentials. Fields marked with * are required.' },
+            { id: 'voice-btn', title: 'Voice Assistant', text: 'Speak to login or register hands-free.' },
+            { id: 'tour-help', title: 'Help', text: 'Click here to see standard voice commands.' }
+        ];
+
+        let currentStep = 0;
+        function startTour() {
+            const overlay = document.getElementById('tour-overlay');
+            if (overlay) overlay.style.display = 'block';
+            currentStep = 0;
+            showStep();
+        }
+        function showStep() {
+            document.querySelectorAll('.tour-highlight').forEach(e => e.classList.remove('tour-highlight'));
+            if(currentStep >= tourSteps.length) { endTour(); return; }
+            
+            const step = tourSteps[currentStep];
+            const el = document.getElementById(step.id);
+            if (!el) { currentStep++; showStep(); return; }
+            el.scrollIntoView({behavior: 'smooth', block: 'center'});
+            el.classList.add('tour-highlight');
+            
+            const tooltip = document.getElementById('tour-tooltip');
+            const rect = el.getBoundingClientRect();
+            if (tooltip) {
+                tooltip.style.display = 'block';
+                tooltip.style.top = (rect.bottom + 10) + 'px';
+                tooltip.style.left = Math.max(10, rect.left) + 'px';
+            }
+            
+            const title = document.getElementById('tour-title');
+            const desc = document.getElementById('tour-desc');
+            if (title) title.innerText = step.title;
+            if (desc) desc.innerText = step.text;
+        }
+        function nextStep() { currentStep++; showStep(); }
+        function endTour() {
+            const overlay = document.getElementById('tour-overlay');
+            if (overlay) overlay.style.display = 'none';
+            const tooltip = document.getElementById('tour-tooltip');
+            if (tooltip) tooltip.style.display = 'none';
+            document.querySelectorAll('.tour-highlight').forEach(e => e.classList.remove('tour-highlight'));
+        }
+        function toggleHelp() { const el = document.getElementById('help-section'); if (el) el.classList.toggle('hidden'); }
+
+        // --- 3D Setup (GLTF) ---
+        let scene, camera, renderer, doctorModel, patientModel, mixer;
+        const clock = new THREE.Clock();
+
+        function loadModels() {
+            const loader = new THREE.GLTFLoader();
+
+            loader.load("doctor.glb", (gltf) => {
+                doctorModel = gltf.scene;
+                doctorModel.scale.set(6,6,6);
+                doctorModel.position.set(0,-2,0);
+                scene.add(doctorModel);
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    mixer = new THREE.AnimationMixer(doctorModel);
+                    const action = mixer.clipAction(gltf.animations[0]);
+                    action.play();
+                }
+            }, undefined, (err) => {
+                console.warn('Failed to load doctor.glb', err);
+            });
+
+            loader.load("patient.glb", (gltf) => {
+                patientModel = gltf.scene;
+                patientModel.scale.set(6,6,6);
+                patientModel.position.set(0,-2,0);
+                patientModel.visible = false;
+                scene.add(patientModel);
+            }, undefined, (err) => {
+                console.warn('Failed to load patient.glb', err);
+            });
+        }
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            if(!container) return;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827);
+            scene.fog = new THREE.Fog(0x111827, 10, 50);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth/container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 0, 18);
+            camera.lookAt(0, -1, 0);
+
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableZoom = false;
+
+            // load GLTF models
+            loadModels();
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const spot = new THREE.SpotLight(0x3b82f6, 1.5);
+            spot.position.set(10, 20, 10);
+            spot.castShadow = true;
+            scene.add(spot);
+
+            const floor = new THREE.Mesh(new THREE.PlaneGeometry(50,50), new THREE.MeshStandardMaterial({color:0x0f172a}));
+            floor.rotation.x = -Math.PI/2;
+            floor.position.y = -6.5;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                const delta = clock.getDelta();
+                if (mixer) mixer.update(delta);
+                if (doctorModel && doctorModel.visible) doctorModel.rotation.y += 0.01;
+                if (patientModel && patientModel.visible) patientModel.rotation.y += 0.01;
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        // Start 3D after DOM ready
+        document.addEventListener('DOMContentLoaded', () => init3D());
+    </script>
+
+    <!-- FORGOT PASSWORD POPUP -->
+<div id="forgot-popup" 
+     class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-xl">
+
+        <h2 class="text-lg font-bold text-white mb-4">Reset Password</h2>
+
+        <!-- Enter Email -->
+        <label class="text-xs text-gray-300">Registered Email</label>
+        <div class="flex gap-2 mt-1">
+            <input id="fp-email" type="email" 
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                placeholder="Enter email">
+
+            <button onclick="sendFPOTP()"
+                class="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500">
+                Send OTP
+            </button>
+        </div>
+
+        <!-- OTP Input -->
+        <input id="fp-otp" type="text"
+            class="w-full px-3 py-2 mt-3 bg-gray-800 border border-gray-700 rounded-lg text-white hidden"
+            placeholder="Enter OTP">
+
+        <!-- New Password -->
+        <div id="fp-pass-section" class="hidden">
+            <label class="block mt-3 text-xs text-gray-300">New Password</label>
+            <input id="fp-pass" type="password"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                placeholder="Enter new password">
+
+            <label class="block mt-3 text-xs text-gray-300">Confirm Password</label>
+            <input id="fp-pass2" type="password"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                placeholder="Confirm password">
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex justify-end mt-5 gap-2">
+            <button onclick="closeForgotPassword()"
+                class="text-gray-400 hover:text-white text-xs px-3 py-1">
+                Cancel
+            </button>
+
+            <button id="fp-submit" onclick="submitNewPassword()" 
+                class="bg-green-600 text-white text-xs px-4 py-2 rounded-lg hover:bg-green-500 hidden">
+                Update
+            </button>
+        </div>
+    </div>
+</div>
+
+    <script>
+        // --- Forgot password flow (UI-only demo) ---
+        function openForgotPassword() {
+            const fp = document.getElementById("forgot-popup");
+            if (fp) fp.classList.remove("hidden");
+        }
+
+        function closeForgotPassword() {
+            const fp = document.getElementById("forgot-popup");
+            if (fp) fp.classList.add("hidden");
+        }
+
+        let FP_OTP = "";
+
+        function sendFPOTP() {
+            const emailEl = document.getElementById("fp-email");
+            const email = emailEl ? emailEl.value.trim() : '';
+            if (!email.includes("@")) {
+                alert("Please enter a valid email!");
+                return;
+            }
+
+            FP_OTP = Math.floor(100000 + Math.random() * 900000).toString();
+            console.log("OTP:", FP_OTP);
+
+            alert("OTP sent to " + email);
+
+            const otpEl = document.getElementById("fp-otp");
+            if (otpEl) otpEl.classList.remove("hidden");
+        }
+
+        function submitNewPassword() {
+            const p1 = (document.getElementById("fp-pass") || {}).value?.trim() || '';
+            const p2 = (document.getElementById("fp-pass2") || {}).value?.trim() || '';
+
+            if (!p1 || !p2) {
+                alert("Please fill both password fields");
+                return;
+            }
+
+            if (p1 !== p2) {
+                alert("Passwords do not match");
+                return;
+            }
+
+            alert("Password Updated Successfully!");
+            closeForgotPassword();
+        }
+
+        // guard fp-otp input listener: attach when DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const fpOtp = document.getElementById("fp-otp");
+            if (fpOtp) {
+                fpOtp.addEventListener("input", function () {
+                    if (this.value === FP_OTP) {
+                        this.classList.add("border-green-500");
+                        const sec = document.getElementById("fp-pass-section");
+                        const submit = document.getElementById("fp-submit");
+                        if (sec) sec.classList.remove("hidden");
+                        if (submit) submit.classList.remove("hidden");
+                    }
+                });
+            }
+        });
+    </script>
+
+    <!-- Firebase auth + username-based login module (adapted for File B) -->
+    <script type="module">
+      import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+      import {
+        getAuth,
+        createUserWithEmailAndPassword,
+        signInWithEmailAndPassword,
+        onAuthStateChanged
+      } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+      import {
+        getFirestore,
+        setDoc,
+        doc,
+        collection,
+        query,
+        where,
+        getDocs
+      } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+      // ---------- CONFIG ----------
+      const firebaseConfig = {
+        apiKey: "AIzaSyDozLLKWzMHLC8nNnvKrZTwEgvLuCt2re0",
+        authDomain: "vidyaaai.firebaseapp.com",
+        projectId: "vidyaaai",
+        storageBucket: "vidyaaai.firebasestorage.app",
+        messagingSenderId: "920193754336",
+        appId: "1:920193754336:web:ff01c0cfe91b3b42a21c85"
+      };
+
+      // Initialize
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      // ---------- Helper: find doctor by username ----------
+      async function findDoctorByUsername(username) {
+        if (!username) return null;
+        const col = collection(db, 'doctors');
+        const q = query(col, where('profile.username', '==', username));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        const d = snap.docs[0];
+        return { id: d.id, data: d.data() };
+      }
+
+      // ---------- Create doctor account ----------
+            async function createDoctorAccount({ username, name, email, mobile, password, speciality }) {
+        if (!username || !name || !email || !password) {
+          throw new Error('Missing required registration fields.');
+        }
+
+        const existing = await findDoctorByUsername(username);
+        if (existing) throw new Error('Username already taken.');
+
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = cred.user.uid;
+
+                const profile = {
+                    username,
+                    name,
+                    email,
+                    mobile: mobile || '',
+                    speciality: speciality || '',
+                    role: 'doctor',
+                    createdAt: new Date().toISOString()
+                };
+        await setDoc(doc(db, 'doctors', uid), { profile });
+
+        return cred.user;
+      }
+
+      // ---------- Sign in by email ----------
+      async function signInByEmail(email, password) {
+        if (!email || !password) {
+          throw new Error('Missing email or password.');
+        }
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        return cred.user;
+      }
+
+      // ---------- Sign in by username (lookup -> sign in by email) ----------
+      async function signInByUsername(username, password) {
+        if (!username || !password) throw new Error('Missing username or password.');
+        const rec = await findDoctorByUsername(username);
+        if (!rec) throw new Error('No doctor found with that username.');
+        const storedEmail = rec.data && rec.data.profile && rec.data.profile.email;
+        if (!storedEmail) throw new Error('Doctor record missing email.');
+        return await signInByEmail(storedEmail, password);
+      }
+
+      // Expose to global scope
+      window.firebaseCreateDoctor = createDoctorAccount;
+      window.firebaseSignInByEmail = signInByEmail;
+      window.firebaseSignInByUsername = signInByUsername;
+      window.firebaseFindDoctorByUsername = findDoctorByUsername;
+
+      // Auth observer: redirect safely
+      onAuthStateChanged(auth, (user) => {
+        if (!user) return;
+        const localpart = (user.email || user.uid || '').split('@')[0];
+
+        try {
+          const path = (window.location.pathname || '').toLowerCase();
+          if (path.includes('login.html') || path.includes('signin') || path.includes('register')) {
+            console.log('User signed in, but staying on login/register page by design.');
+            return;
+          }
+        } catch (e) {
+          // continue to redirect
+        }
+
+        const role = window.currentRole || 'doctor';
+        setTimeout(() => {
+          if (role === 'doctor') {
+            window.location.href = `index.html?uid=${encodeURIComponent(user.uid)}&user=${encodeURIComponent(localpart)}&role=doctor`;
+          } else {
+            window.location.href = `patient.html?uid=${encodeURIComponent(user.uid)}&user=${encodeURIComponent(localpart)}&role=patient`;
+          }
+        }, 500);
+      });
+
+      console.log('Firebase auth module loaded for File B.');
+    </script>
+</body>
+</html>

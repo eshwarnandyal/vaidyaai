@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaidya AI - Professional Medical Suite</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- GSAP & Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Dark Slate */
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, .brand-font {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* Canvas fixed background */
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%);
+        }
+
+        /* Glassmorphism Cards */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        .glass-nav {
+            background: rgba(2, 6, 23, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2563eb;
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .v-code-badge {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Voice Assistant Pulse Animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        
+        .voice-active::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(59, 130, 246, 0.6);
+            border-radius: 50%;
+            z-index: -1;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        /* SOP Cards - Individual Styling */
+        .sop-card {
+            position: relative;
+            z-index: 10;
+            display: block;
+        }
+
+        .sop-card:hover {
+            transform: translateY(-10px) scale(1.03) !important;
+        }
+
+        .icon-circle {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .feature-card:hover .icon-circle {
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        .feature-card h3,
+        .feature-card p {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* 3D Logo Container */
+        #logo-3d-container {
+            cursor: grab;
+        }
+
+        #logo-3d-container:active {
+            cursor: grabbing;
+        }
+
+        /* --- Hanging Stethoscope Animation --- */
+        @keyframes swing {
+            0% { transform: rotate(5deg); }
+            50% { transform: rotate(-5deg); }
+            100% { transform: rotate(5deg); }
+        }
+
+        .hanging-stethoscope {
+            display: none;
+            position: absolute;
+            top: 80%; /* Hangs from bottom of button */
+            right: 10px;
+            width: 60px;
+            height: auto;
+            z-index: 60;
+            transform-origin: top center;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5));
+            pointer-events: none; /* Let clicks pass through */
+        }
+
+        /* Show and animate on hover of the parent container */
+        .login-container:hover .hanging-stethoscope {
+            display: block;
+            animation: swing 2s ease-in-out infinite;
+        }
+
+        /* --- Voice Tooltip Animations --- */
+        @keyframes tooltip-pulse {
+            0%, 100% { opacity: 0.8; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+
+        /* DESKTOP BEHAVIOR:
+           - Default: Opacity 0, Hidden
+           - Hover: Opacity 1, Visible
+           - Position: LEFT of the button
+        */
+        .voice-tooltip-custom {
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            position: absolute;
+            top: 50%;
+            right: 120%; /* Position to the LEFT of the button container */
+            transform: translateY(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(8px);
+            padding: 1rem;
+            border-radius: 1rem;
+            width: 200px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 60;
+        }
+
+        .voice-btn-container:hover .voice-tooltip-custom {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(-50%) translateX(0);
+        }
+
+        /* MOBILE BEHAVIOR:
+           - Default: Opacity 1, Visible (pulsing)
+           - Transparent Background
+           - Position: LEFT of the button
+        */
+        @media (max-width: 768px) {
+            .voice-tooltip-custom {
+                opacity: 1; 
+                visibility: visible; 
+                animation: tooltip-pulse 3s infinite;
+                top: 50%;
+                right: 110%; /* Slightly closer on mobile */
+                transform: translateY(-50%);
+                width: 160px;
+                font-size: 0.8rem;
+                
+                /* Transparent Glass Style for Mobile */
+                background: rgba(0, 0, 0, 0.2); /* Very transparent dark tint */
+                backdrop-filter: blur(4px);      /* Subtle blur */
+                border: 1px solid rgba(255,255,255,0.1);
+                box-shadow: none;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.9); /* Strong shadow for text visibility */
+            }
+
+            /* Ensure text is readable */
+            .voice-tooltip-custom .text-blue-400 {
+                color: #60a5fa; /* Bright Blue */
+                text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+            }
+            
+            /* Class added by JS when scrolled > 10% on mobile */
+            .voice-tooltip-custom.mobile-scroll-hide {
+                opacity: 0 !important;
+                visibility: hidden !important;
+                animation: none; 
+                transition: opacity 0.5s ease;
+            }
+        }
+        
+        #voice-btn {
+            touch-action: manipulation; /* Improves touch response on mobile */
+        }
+
+    </style>
+</head>
+<body class="antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- 3D Background -->
+    <div id="canvas-container"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass-nav transition-all duration-300" id="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex items-center space-x-3">
+                    <a href="index.html" onclick="location.reload(); return false;" class="flex items-center space-x-3 cursor-pointer group">
+                        <div id="logo-3d-container" class="w-12 h-12 rounded-xl shadow-lg relative overflow-hidden transition-transform group-hover:scale-110" style="background: linear-gradient(135deg, #3b82f6 0%, #14b8a6 100%);">
+                            <!-- 3D Stethoscope will be rendered here -->
+                        </div>
+                        <span class="brand-font text-2xl font-bold tracking-tight group-hover:text-blue-300 transition-colors">Vaidya <span class="text-blue-400">AI</span></span>
+                    </a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#hero" class="hover:text-blue-400 transition-colors px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                        <a href="#about-us" class="hover:text-blue-400 transition-colors px-3 py-2 rounded-md text-sm font-medium">About Us</a>
+                        <a href="#sop-cards" class="hover:text-blue-400 transition-colors px-3 py-2 rounded-md text-sm font-medium">Modules</a>
+                        <a href="#features" class="hover:text-blue-400 transition-colors px-3 py-2 rounded-md text-sm font-medium">Features</a>
+                        
+                        <!-- Login Button with Hanging Stethoscope -->
+                        <div class="relative inline-block login-container group">
+                            <a id="doctor-login-btn" href="login.html" target="_blank"
+class="relative z-10 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full text-sm font-medium transition-all shadow-lg hover:shadow-blue-500/50 flex items-center gap-2">
+    Patient Login
+    <i data-lucide="log-in" class="w-4 h-4"></i>
+</a>
+
+                            <!-- The Hanging Stethoscope SVG -->
+                            <svg class="hanging-stethoscope" viewBox="0 0 100 200" xmlns="http://www.w3.org/2000/svg">
+                                <!-- Earpieces -->
+                                <path d="M30 10 Q50 0 70 10" fill="none" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+                                <circle cx="30" cy="10" r="5" fill="#334155"/>
+                                <circle cx="70" cy="10" r="5" fill="#334155"/>
+                                <!-- Tubing Y shape -->
+                                <path d="M30 10 L30 40 Q30 70 50 90 Q70 70 70 40 L70 10" fill="none" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+                                <!-- Main Tube -->
+                                <path d="M50 90 L50 160" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/>
+                                <!-- Chest Piece -->
+                                <circle cx="50" cy="170" r="15" fill="#0ea5e9" stroke="#cbd5e1" stroke-width="2"/>
+                                <circle cx="50" cy="170" r="10" fill="#f8fafc" opacity="0.8"/>
+                            </svg>
+                        </div>
+
+                    </div>
+                </div>
+                <!-- Logout Button -->
+<button id="logout-btn"
+class="hidden bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-full text-sm font-medium transition-all shadow-lg hover:shadow-red-500/50 flex items-center gap-2">
+    Logout
+    <i data-lucide="log-out" class="w-4 h-4"></i>
+</button>
+
+                <div class="-mr-2 flex md:hidden">
+                    <button type="button" id="mobile-menu-btn" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-slate-900/95 backdrop-blur-md border-t border-white/10">
+                <a href="#hero" class="block hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium">Home</a>
+                <a href="#about-us" class="block hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium">About Us</a>
+                <a href="#sop-cards" class="block hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium">Modules</a>
+                <a href="#features" class="block hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-base font-medium">Features</a>
+                <a href="login.html" target="_blank" class="block bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-base font-medium text-center">
+                    Doctor Login
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="relative min-h-screen flex items-center justify-center pt-20">
+        <!-- Changed container to w-full and removed mx-auto/max-w to eliminate gap -->
+        <div class="w-full flex flex-col md:flex-row items-center">
+            
+            <!-- Content on the LEFT with minimal padding for edge alignment -->
+            <div class="md:w-1/2 text-left z-10 hero-content pl-4 md:pl-8">
+                <div class="inline-block px-4 py-1 rounded-full bg-blue-900/30 border border-blue-500/30 text-blue-400 text-sm font-semibold mb-6 backdrop-blur-sm">
+                    Next Gen Medical Practice
+                </div>
+                <h1 class="text-5xl md:text-7xl font-extrabold leading-tight mb-6">
+                    Advanced AI for <br>
+                    <span class="text-gradient">Modern Healthcare</span>
+                </h1>
+                <p class="text-xl text-gray-300 mb-8 leading-relaxed max-w-lg">
+                    The comprehensive guide and operating system for medical doctors. Manage patients, analytics, and RMP interactions with voice-activated AI.
+                </p>
+                <div class="flex space-x-4">
+                    <a href="login.html" target="_blank" class="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold py-4 px-8 rounded-full transition-all transform hover:-translate-y-1 inline-block text-center relative z-10 shadow-lg hover:shadow-blue-500/50">
+                        Register as Doctor
+                    </a>
+                    <a href="#sop-cards" class="glass-card hover:bg-white/10 text-white font-semibold py-4 px-8 rounded-full border border-white/20 transition-all inline-block text-center">
+                        View SOP Manual
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Right side empty for 3D elements -->
+            <div class="md:w-1/2 h-full"></div>
+
+        </div>
+        
+        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce text-gray-500">
+            <i data-lucide="chevron-down" class="w-8 h-8"></i>
+        </div>
+    </section>
+    
+    <!-- About Us Section -->
+    <section id="about-us" class="py-24 bg-gradient-to-b from-slate-900 to-slate-950 relative overflow-hidden">
+        <!-- Decorative Background Elements -->
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full filter blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-96 h-96 bg-teal-500 rounded-full filter blur-3xl"></div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <!-- Section Header -->
+            <div class="text-center mb-16">
+                <div class="inline-block px-4 py-1 rounded-full bg-blue-900/30 border border-blue-500/30 text-blue-400 text-sm font-semibold mb-6 backdrop-blur-sm">
+                    Who We Are
+                </div>
+                <h2 class="text-4xl md:text-5xl font-bold mb-6">About Us</h2>
+            </div>
+
+            <!-- Main Content -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
+                <!-- Left: Text Content -->
+                <div class="space-y-6">
+                    <div class="glass-card p-8 rounded-2xl">
+                        <div class="flex items-start gap-4 mb-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center shrink-0">
+                                <i data-lucide="heart-pulse" class="w-6 h-6 text-blue-400"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-bold text-white mb-4">Vaidya AI</h3>
+                                <p class="text-gray-300 text-lg leading-relaxed">
+                                    Vaidya AI is an innovative healthcare platform designed to connect patients, doctors, and administrators through advanced technology, AI-driven tools, and seamless communication.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Visual Element -->
+                <div class="relative">
+                    <div class="glass-card p-8 rounded-2xl">
+                        <div class="grid grid-cols-2 gap-6">
+                            <div class="text-center p-6 bg-blue-900/20 rounded-xl border border-blue-500/20">
+                                <i data-lucide="users" class="w-12 h-12 text-blue-400 mx-auto mb-3"></i>
+                                <h4 class="text-3xl font-bold text-white mb-2">10K+</h4>
+                                <p class="text-gray-400 text-sm">Active Users</p>
+                            </div>
+                            <div class="text-center p-6 bg-teal-900/20 rounded-xl border border-teal-500/20">
+                                <i data-lucide="hospital" class="w-12 h-12 text-teal-400 mx-auto mb-3"></i>
+                                <h4 class="text-3xl font-bold text-white mb-2">500+</h4>
+                                <p class="text-gray-400 text-sm">Doctors</p>
+                            </div>
+                            <div class="text-center p-6 bg-purple-900/20 rounded-xl border border-purple-500/20">
+                                <i data-lucide="activity" class="w-12 h-12 text-purple-400 mx-auto mb-3"></i>
+                                <h4 class="text-3xl font-bold text-white mb-2">24/7</h4>
+                                <p class="text-gray-400 text-sm">AI Support</p>
+                            </div>
+                            <div class="text-center p-6 bg-pink-900/20 rounded-xl border border-pink-500/20">
+                                <i data-lucide="shield-check" class="w-12 h-12 text-pink-400 mx-auto mb-3"></i>
+                                <h4 class="text-3xl font-bold text-white mb-2">100%</h4>
+                                <p class="text-gray-400 text-sm">Secure</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Our Vision Section -->
+            <div class="max-w-4xl mx-auto">
+                <div class="glass-card p-10 rounded-2xl border-2 border-blue-500/30 relative overflow-hidden">
+                    <!-- Glow Effect -->
+                    <div class="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/20 rounded-full filter blur-3xl"></div>
+                    <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-teal-500/20 rounded-full filter blur-3xl"></div>
+                    
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="w-14 h-14 rounded-full bg-gradient-to-r from-blue-600 to-teal-500 flex items-center justify-center">
+                                <i data-lucide="eye" class="w-7 h-7 text-white"></i>
+                            </div>
+                            <h3 class="text-3xl font-bold text-gradient">Our Vision</h3>
+                        </div>
+                        <p class="text-gray-200 text-xl leading-relaxed">
+                            To revolutionize the future of digital healthcare by combining AI, voice technology, and intelligent workflows to simplify health communication for both patients and professionals.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow / How it works -->
+    <section id="features" class="py-24 bg-slate-900/50 backdrop-blur-md border-y border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div class="space-y-8">
+                    <h2 class="text-4xl font-bold">Seamless Workflow</h2>
+                    <div class="space-y-6">
+                        <div class="flex gap-4 feature-item opacity-0 translate-y-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center shrink-0">
+                                <span class="font-bold text-blue-400">01</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold mb-2">Register & Verify</h4>
+                                <p class="text-gray-400">Complete digital onboarding with your Medical Registration Number and specialization details.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 feature-item opacity-0 translate-y-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center shrink-0">
+                                <span class="font-bold text-blue-400">02</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold mb-2">Voice Login</h4>
+                                <p class="text-gray-400">Just say "Vaidya, log me in". Secure, voice-biometric authenticated access to your practice.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 feature-item opacity-0 translate-y-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center shrink-0">
+                                <span class="font-bold text-blue-400">03</span>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold mb-2">Analyze & Act</h4>
+                                <p class="text-gray-400">Use V1-V5 codes to switch contexts instantly. From checking stats to messaging patients.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="relative h-96 rounded-2xl overflow-hidden glass-card border-0 shadow-2xl flex items-center justify-center">
+                    <!-- Placeholder for 3D Interaction focus -->
+                    <div class="text-center p-8">
+                        <i data-lucide="cpu" class="w-24 h-24 text-blue-500 mx-auto mb-6 opacity-80"></i>
+                        <h3 class="text-2xl font-bold text-white mb-2">AI Powered Core</h3>
+                        <p class="text-gray-400">Processing voice data, social analytics, and patient records in real-time.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SOP / Quick Access Cards (NEW SECTION) -->
+    <section id="sop-cards" class="py-24 relative z-20 bg-slate-950">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Core Modules for Patient's (SOP)</h2>
+                <p class="text-gray-400">Direct access to Vaidya AI application modules for Patient's</p>
+            </div>
+
+            <!-- Grid for EXACTLY 5 cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                
+                <!-- V1 Card - BRIGHT BLUE -->
+                <a href="v1.html" target="_blank" class="p-8 block group cursor-pointer sop-card rounded-2xl border-3 transition-all duration-300 hover:scale-105" 
+                   style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border: 3px solid #60a5fa; box-shadow: 0 15px 50px rgba(59, 130, 246, 0.6);">
+                    <div class="icon-circle bg-indigo-600 text-white shadow-lg shadow-indigo-500/50">
+                        <i data-lucide="activity" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Posters (V1)</h3>
+                    <p class="text-sm text-blue-100 leading-relaxed">
+                        View multiple posters from different doctors (scrollable).
+                    </p>
+                </a>
+
+                <!-- V2 Card - DARK BLUE -->
+                <a href="v2.html" target="_blank" class="p-8 block group cursor-pointer sop-card rounded-2xl border-3 transition-all duration-300 hover:scale-105" 
+                   style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); border: 3px solid #3b82f6; box-shadow: 0 15px 50px rgba(30, 58, 138, 0.6);">
+                    <div class="icon-circle bg-purple-600 text-white shadow-lg shadow-purple-500/50">
+                        <i data-lucide="image-plus" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Doctors (V2)</h3>
+                    <p class="text-sm text-blue-200 leading-relaxed">
+                        Search & interact with doctors (call/chat).
+                    </p>
+                </a>
+
+                <!-- V3 Card - TEAL -->
+                <a href="v3.html" target="_blank" class="p-8 block group cursor-pointer sop-card rounded-2xl border-3 transition-all duration-300 hover:scale-105" 
+                   style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); border: 3px solid #14b8a6; box-shadow: 0 15px 50px rgba(13, 148, 136, 0.6);">
+                    <div class="icon-circle bg-teal-600 text-white shadow-lg shadow-teal-500/50">
+                        <i data-lucide="users" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Products (V3)</h3>
+                    <p class="text-sm text-teal-100 leading-relaxed">
+                        Explore doctor-provided health packages
+                    </p>
+                </a>
+
+                <!-- V4 Card - PINK -->
+                <a href="v4.html" target="_blank" class="p-8 block group cursor-pointer sop-card rounded-2xl border-3 transition-all duration-300 hover:scale-105" 
+                   style="background: linear-gradient(135deg, #db2777 0%, #be185d 100%); border: 3px solid #ec4899; box-shadow: 0 15px 50px rgba(219, 39, 119, 0.6);">
+                    <div class="icon-circle bg-pink-600 text-white shadow-lg shadow-pink-500/50">
+                        <i data-lucide="message-square" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Health Tips (V4)</h3>
+                    <p class="text-sm text-pink-100 leading-relaxed">
+                        View past health tips extracted from doctors’ posters.
+                    </p>
+                </a>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 bg-black/40 border-t border-white/10 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Grid Layout for Footer Content -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                <div class="col-span-1 md:col-span-3">
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">V</div>
+                        <span class="text-xl font-bold text-white">Vaidya AI</span>
+                    </div>
+                    <p class="text-gray-400 text-sm max-w-xs">
+                        Empowering doctors with cutting-edge AI tools for better patient outcomes and practice management.
+                    </p>
+                </div>
+                
+                <!-- Legal Column -->
+                <div>
+                    <h4 class="text-white font-bold mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li><a href="PrivacyPolicy.html" class="hover:text-blue-400">Privacy Policy</a></li>
+                        <li><a href="TermsofService.html" class="hover:text-blue-400">Terms of Service</a></li>
+                        <li><a href="Aboutus.html" class="hover:text-blue-400">About Us</a></li>
+                        <li><a href="roubleshooting.html" class="hover:text-blue-400">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Bottom Bar with Centered Content -->
+            <div class="border-t border-white/10 pt-8 flex flex-col items-center justify-center gap-4">
+                <p class="text-gray-500 text-sm text-center">© 2024 Vaidya AI. All rights reserved.</p>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-400 hover:text-white"><i data-lucide="facebook" class="w-5 h-5"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i data-lucide="instagram" class="w-5 h-5"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i data-lucide="twitter" class="w-5 h-5"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Fixed Floating Action Buttons Container -->
+    <div class="fixed bottom-8 right-8 z-50 flex flex-col gap-4 items-center">
+        
+        <!-- Call Button -->
+        <a href="tel:+1234567890" class="w-12 h-12 bg-slate-700 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-xl transition-all transform hover:scale-110 group relative border border-white/10">
+            <i data-lucide="phone" class="w-6 h-6"></i>
+            <span class="absolute right-14 bg-slate-800 text-white text-xs py-1 px-3 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10">
+                Call Support
+            </span>
+        </a>
+
+        <!-- Contact Us Button -->
+        <a href="mailto:support@vaidyaai.com" class="w-12 h-12 bg-slate-700 hover:bg-blue-500 rounded-full flex items-center justify-center text-white shadow-xl transition-all transform hover:scale-110 group relative border border-white/10">
+            <i data-lucide="mail" class="w-6 h-6"></i>
+            <span class="absolute right-14 bg-slate-800 text-white text-xs py-1 px-3 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10">
+                Contact Us
+            </span>
+        </a>
+
+        <!-- Voice Assistant Button with Auto/Hover Tooltip -->
+        <div class="relative voice-btn-container">
+            <button id="voice-btn" class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl hover:bg-blue-500 transition-all transform hover:scale-110 relative z-10">
+                <i data-lucide="mic" class="w-8 h-8"></i>
+            </button>
+            <!-- Smart Tooltip -->
+            <div class="voice-tooltip-custom text-left">
+                <div class="font-bold text-blue-400 mb-1 text-sm flex items-center gap-2">
+                    <i data-lucide="sparkles" class="w-3 h-3"></i> Click & Say:
+                </div>
+                <ul class="text-xs text-gray-300 space-y-1 list-disc pl-4">
+                    <li>"Open V1"</li>
+                    <li>"Open Login"</li>
+                    <li>"Open V2"</li>
+                    <li>"Open V3 upto V5" </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- 3D Logo Stethoscope with OrbitControls ---
+        const initLogoStethoscope = () => {
+            const container = document.getElementById('logo-3d-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene
+            const scene = new THREE.Scene();
+            
+            // Camera
+            const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+            camera.position.set(0, 2, 10);
+
+            // Renderer
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setClearColor(0x000000, 0);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // OrbitControls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enableZoom = true;
+            controls.enablePan = false;
+            controls.minDistance = 6;
+            controls.maxDistance = 15;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 2;
+
+            // Create Realistic Stethoscope
+            const stethoscopeGroup = new THREE.Group();
+
+            // Materials
+            const metalMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xe8e8e8, 
+                metalness: 0.9, 
+                roughness: 0.2,
+                envMapIntensity: 1
+            });
+
+            const tubeMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x2563eb, 
+                metalness: 0.3, 
+                roughness: 0.4
+            });
+
+            const rubberMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1e293b, 
+                metalness: 0.1, 
+                roughness: 0.8
+            });
+
+            // Earpieces - more detailed
+            const earTipGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+            const earTipMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x334155, 
+                metalness: 0.2, 
+                roughness: 0.7
+            });
+            
+            const leftEarTip = new THREE.Mesh(earTipGeometry, earTipMaterial);
+            leftEarTip.position.set(-1.5, 2, 0);
+            leftEarTip.castShadow = true;
+            stethoscopeGroup.add(leftEarTip);
+            
+            const rightEarTip = new THREE.Mesh(earTipGeometry, earTipMaterial);
+            rightEarTip.position.set(1.5, 2, 0);
+            rightEarTip.castShadow = true;
+            stethoscopeGroup.add(rightEarTip);
+
+            // Metal ear connectors
+            const connectorGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 16);
+            
+            const leftConnector = new THREE.Mesh(connectorGeometry, metalMaterial);
+            leftConnector.position.set(-1.3, 1.6, 0);
+            leftConnector.rotation.z = -0.3;
+            leftConnector.castShadow = true;
+            stethoscopeGroup.add(leftConnector);
+            
+            const rightConnector = new THREE.Mesh(connectorGeometry, metalMaterial);
+            rightConnector.position.set(1.3, 1.6, 0);
+            rightConnector.rotation.z = 0.3;
+            rightConnector.castShadow = true;
+            stethoscopeGroup.add(rightConnector);
+
+            // Tubing - more realistic curved paths with multiple segments
+            const createTube = (startPos, endPos, side) => {
+                const curve = new THREE.CubicBezierCurve3(
+                    startPos,
+                    new THREE.Vector3(startPos.x * 0.7, startPos.y - 1, startPos.z + 0.5),
+                    new THREE.Vector3(endPos.x * 0.3, endPos.y + 1, endPos.z + 0.3),
+                    endPos
+                );
+                
+                const tubeGeometry = new THREE.TubeGeometry(curve, 32, 0.18, 12, false);
+                const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+                tube.castShadow = true;
+                tube.receiveShadow = true;
+                return tube;
+            };
+
+            const leftTube = createTube(
+                new THREE.Vector3(-1.3, 1.4, 0),
+                new THREE.Vector3(-0.3, -1, 0),
+                'left'
+            );
+            stethoscopeGroup.add(leftTube);
+
+            const rightTube = createTube(
+                new THREE.Vector3(1.3, 1.4, 0),
+                new THREE.Vector3(0.3, -1, 0),
+                'right'
+            );
+            stethoscopeGroup.add(rightTube);
+
+            // Y-junction where tubes meet
+            const junctionGeometry = new THREE.SphereGeometry(0.22, 16, 16);
+            const junction = new THREE.Mesh(junctionGeometry, metalMaterial);
+            junction.position.set(0, -1.2, 0);
+            junction.castShadow = true;
+            stethoscopeGroup.add(junction);
+
+            // Main tube to chest piece
+            const mainTubeCurve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(0, -1.2, 0),
+                new THREE.Vector3(0, -2, 0.2),
+                new THREE.Vector3(0, -2.8, 0)
+            );
+            const mainTubeGeometry = new THREE.TubeGeometry(mainTubeCurve, 20, 0.2, 12, false);
+            const mainTube = new THREE.Mesh(mainTubeGeometry, tubeMaterial);
+            mainTube.castShadow = true;
+            mainTube.receiveShadow = true;
+            stethoscopeGroup.add(mainTube);
+
+            // Chest piece base (diaphragm housing)
+            const chestBaseGeometry = new THREE.CylinderGeometry(0.65, 0.7, 0.4, 32);
+            const chestBaseMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x0ea5e9, 
+                metalness: 0.8, 
+                roughness: 0.2
+            });
+            const chestBase = new THREE.Mesh(chestBaseGeometry, chestBaseMaterial);
+            chestBase.position.set(0, -3.2, 0);
+            chestBase.rotation.x = Math.PI / 2;
+            chestBase.castShadow = true;
+            chestBase.receiveShadow = true;
+            stethoscopeGroup.add(chestBase);
+
+            // Diaphragm (the listening membrane)
+            const diaphragmGeometry = new THREE.CylinderGeometry(0.6, 0.6, 0.05, 32);
+            const diaphragmMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xf8fafc, 
+                metalness: 0.5, 
+                roughness: 0.3
+            });
+            const diaphragm = new THREE.Mesh(diaphragmGeometry, diaphragmMaterial);
+            diaphragm.position.set(0, -3.2, 0.2);
+            diaphragm.rotation.x = Math.PI / 2;
+            diaphragm.castShadow = true;
+            stethoscopeGroup.add(diaphragm);
+
+            // Decorative rim
+            const rimGeometry = new THREE.TorusGeometry(0.65, 0.08, 16, 32);
+            const rim = new THREE.Mesh(rimGeometry, metalMaterial);
+            rim.position.set(0, -3.2, 0);
+            rim.castShadow = true;
+            stethoscopeGroup.add(rim);
+
+            // Add detail lines on chest piece
+            const detailRingGeometry = new THREE.TorusGeometry(0.5, 0.02, 8, 32);
+            const detailRing = new THREE.Mesh(detailRingGeometry, metalMaterial);
+            detailRing.position.set(0, -3.2, 0.15);
+            stethoscopeGroup.add(detailRing);
+
+            // Bell (back side of chest piece)
+            const bellGeometry = new THREE.CylinderGeometry(0.4, 0.45, 0.5, 32);
+            const bell = new THREE.Mesh(bellGeometry, chestBaseMaterial);
+            bell.position.set(0, -3.2, -0.25);
+            bell.rotation.x = Math.PI / 2;
+            bell.castShadow = true;
+            stethoscopeGroup.add(bell);
+
+            // Position and scale the whole stethoscope
+            stethoscopeGroup.scale.set(0.8, 0.8, 0.8);
+            stethoscopeGroup.position.y = 0.5;
+            scene.add(stethoscopeGroup);
+
+            // Enhanced Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            mainLight.position.set(5, 10, 7);
+            mainLight.castShadow = true;
+            mainLight.shadow.camera.near = 0.1;
+            mainLight.shadow.camera.far = 50;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            scene.add(mainLight);
+
+            const fillLight = new THREE.DirectionalLight(0x60a5fa, 0.3);
+            fillLight.position.set(-5, 5, -5);
+            scene.add(fillLight);
+
+            const backLight = new THREE.PointLight(0x14b8a6, 0.5);
+            backLight.position.set(0, -5, -5);
+            scene.add(backLight);
+
+            const rimLight = new THREE.PointLight(0xffffff, 0.4);
+            rimLight.position.set(0, 8, -3);
+            scene.add(rimLight);
+
+            // Animation
+            const animate = () => {
+                requestAnimationFrame(animate);
+                
+                controls.update();
+
+                // Subtle breathing animation
+                const time = Date.now() * 0.001;
+                stethoscopeGroup.position.y = 0.5 + Math.sin(time) * 0.1;
+                
+                // Gentle tube flex
+                leftTube.rotation.z = Math.sin(time * 0.5) * 0.02;
+                rightTube.rotation.z = -Math.sin(time * 0.5) * 0.02;
+
+                renderer.render(scene, camera);
+            };
+
+            animate();
+
+            // Interactive hover effects
+            let isHovered = false;
+            
+            container.addEventListener('mouseenter', () => {
+                isHovered = true;
+                controls.autoRotateSpeed = 4;
+                gsap.to(stethoscopeGroup.scale, { 
+                    x: 0.9, y: 0.9, z: 0.9, 
+                    duration: 0.5, 
+                    ease: "power2.out" 
+                });
+            });
+
+            container.addEventListener('mouseleave', () => {
+                isHovered = false;
+                controls.autoRotateSpeed = 2;
+                gsap.to(stethoscopeGroup.scale, { 
+                    x: 0.8, y: 0.8, z: 0.8, 
+                    duration: 0.5, 
+                    ease: "power2.out" 
+                });
+            });
+
+            // Handle resize
+            window.addEventListener('resize', () => {
+                const newWidth = container.clientWidth;
+                const newHeight = container.clientHeight;
+                camera.aspect = newWidth / newHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(newWidth, newHeight);
+            });
+        };
+
+        // --- Three.js 3D Background Animation ---
+        const initThreeJS = () => {
+            // Initialize 3D Logo Stethoscope
+            initLogoStethoscope();
+            
+            const canvasContainer = document.getElementById('canvas-container');
+            
+            // Scene setup
+            const scene = new THREE.Scene();
+            
+            // Fog for depth
+            scene.fog = new THREE.FogExp2(0x020617, 0.002);
+
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
+            camera.position.y = 0;
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            canvasContainer.appendChild(renderer.domElement);
+
+            // DNA Helix Particle System
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 1200;
+            
+            const posArray = new Float32Array(particlesCount * 3);
+            const colorsArray = new Float32Array(particlesCount * 3);
+            
+            // Colors: Blue and Teal
+            const color1 = new THREE.Color(0x3b82f6); // Blue-500
+            const color2 = new THREE.Color(0x14b8a6); // Teal-500
+
+            for(let i = 0; i < particlesCount; i++) {
+                // Create a double helix shape
+                const i3 = i * 3;
+                const y = (i / particlesCount) * 60 - 30; // Spread along Y axis
+                const radius = 6;
+                const angle = y * 0.5;
+                
+                // Strand 1
+                if (i % 2 === 0) {
+                    posArray[i3] = Math.cos(angle) * radius + (Math.random() - 0.5) * 1.5;
+                    posArray[i3 + 1] = y + (Math.random() - 0.5) * 1.5;
+                    posArray[i3 + 2] = Math.sin(angle) * radius + (Math.random() - 0.5) * 1.5;
+                    
+                    colorsArray[i3] = color1.r;
+                    colorsArray[i3+1] = color1.g;
+                    colorsArray[i3+2] = color1.b;
+                } 
+                // Strand 2 (Offset by PI)
+                else {
+                    posArray[i3] = Math.cos(angle + Math.PI) * radius + (Math.random() - 0.5) * 1.5;
+                    posArray[i3 + 1] = y + (Math.random() - 0.5) * 1.5;
+                    posArray[i3 + 2] = Math.sin(angle + Math.PI) * radius + (Math.random() - 0.5) * 1.5;
+
+                    colorsArray[i3] = color2.r;
+                    colorsArray[i3+1] = color2.g;
+                    colorsArray[i3+2] = color2.b;
+                }
+            }
+
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorsArray, 3));
+
+            // Material
+            const particlesMaterial = new THREE.PointsMaterial({
+                size: 0.15,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            // Mesh
+            const dnaMesh = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(dnaMesh);
+
+            // Floating particles around
+            const dustGeometry = new THREE.BufferGeometry();
+            const dustCount = 500;
+            const dustPos = new Float32Array(dustCount * 3);
+            
+            for(let i = 0; i < dustCount * 3; i++) {
+                dustPos[i] = (Math.random() - 0.5) * 100;
+            }
+            
+            dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+            const dustMaterial = new THREE.PointsMaterial({
+                size: 0.1,
+                color: 0x4b5563,
+                transparent: true,
+                opacity: 0.4
+            });
+            const dustMesh = new THREE.Points(dustGeometry, dustMaterial);
+            scene.add(dustMesh);
+
+
+            // Lights
+            const pointLight = new THREE.PointLight(0x3b82f6, 2);
+            pointLight.position.set(10, 10, 10);
+            scene.add(pointLight);
+
+            // Interaction variables
+            let mouseX = 0;
+            let mouseY = 0;
+            let targetX = 0;
+            let targetY = 0;
+
+            const windowHalfX = window.innerWidth / 2;
+            const windowHalfY = window.innerHeight / 2;
+
+            document.addEventListener('mousemove', (event) => {
+                mouseX = (event.clientX - windowHalfX);
+                mouseY = (event.clientY - windowHalfY);
+            });
+
+            // GSAP ScrollTrigger for Camera Movement
+            gsap.registerPlugin(ScrollTrigger);
+
+            // Animate DNA Rotation based on scroll
+            gsap.to(dnaMesh.rotation, {
+                y: Math.PI * 4, // Rotate 2 full circles
+                ease: "none",
+                scrollTrigger: {
+                    trigger: "body",
+                    start: "top top",
+                    end: "bottom bottom",
+                    scrub: 1
+                }
+            });
+
+            // Animate Camera position based on sections
+            gsap.to(camera.position, {
+                z: 15, // Zoom in
+                scrollTrigger: {
+                    trigger: "#sop-cards",
+                    start: "top bottom",
+                    end: "center center",
+                    scrub: 2
+                }
+            });
+
+            // Animation Loop
+            const clock = new THREE.Clock();
+
+            const animate = () => {
+                targetX = mouseX * 0.001;
+                targetY = mouseY * 0.001;
+
+                const elapsedTime = clock.getElapsedTime();
+
+                // Idle rotation
+                dnaMesh.rotation.z += 0.001;
+                dustMesh.rotation.y -= 0.0005;
+
+                // Mouse interaction easing
+                dnaMesh.rotation.y += 0.05 * (targetX - dnaMesh.rotation.y);
+                dnaMesh.rotation.x += 0.05 * (targetY - dnaMesh.rotation.x);
+
+                // Gentle pulse
+                dnaMesh.position.y = Math.sin(elapsedTime * 0.5) * 0.5;
+
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            };
+
+            animate();
+
+            // Responsive resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        };
+
+        // --- GSAP UI Animations ---
+        const initGSAP = () => {
+            // Hero Animations
+            gsap.from(".hero-content h1", {
+                duration: 1,
+                y: 50,
+                opacity: 0,
+                ease: "power3.out",
+                delay: 0.2
+            });
+            
+            gsap.from(".hero-content p", {
+                duration: 1,
+                y: 30,
+                opacity: 0,
+                ease: "power3.out",
+                delay: 0.4
+            });
+
+            gsap.from(".hero-content a", {
+                duration: 0.8,
+                y: 20,
+                opacity: 0,
+                stagger: 0.2,
+                ease: "back.out(1.7)",
+                delay: 0.6
+            });
+            
+            // Feature Items Stagger
+            gsap.to(".feature-item", {
+                scrollTrigger: {
+                    trigger: "#features",
+                    start: "top 75%",
+                },
+                duration: 0.8,
+                y: 0,
+                opacity: 1,
+                stagger: 0.2,
+                ease: "power2.out"
+            });
+            
+            // SOP Cards Stagger (NEW) - Fixed initial visibility
+            gsap.fromTo(".sop-card", 
+                {
+                    y: 40,
+                    opacity: 0
+                },
+                {
+                    scrollTrigger: {
+                        trigger: "#sop-cards",
+                        start: "top 80%",
+                    },
+                    duration: 0.8,
+                    y: 0,
+                    opacity: 1,
+                    stagger: 0.1,
+                    ease: "power2.out"
+                }
+            );
+        };
+
+        // --- Voice Assistant Logic & Tooltip Scroll Behavior ---
+        const initVoiceAssistant = () => {
+            const btn = document.getElementById('voice-btn');
+            const tooltip = document.querySelector('.voice-tooltip-custom');
+
+            // Mobile Menu Toggle
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            if (mobileMenuBtn && mobileMenu) {
+                mobileMenuBtn.addEventListener('click', () => {
+                    mobileMenu.classList.toggle('hidden');
+                    const icon = mobileMenuBtn.querySelector('i');
+                    if (mobileMenu.classList.contains('hidden')) {
+                        icon.setAttribute('data-lucide', 'menu');
+                    } else {
+                        icon.setAttribute('data-lucide', 'x');
+                    }
+                    lucide.createIcons();
+                });
+
+                // Close mobile menu when clicking on links
+                const mobileLinks = mobileMenu.querySelectorAll('a');
+                mobileLinks.forEach(link => {
+                    link.addEventListener('click', () => {
+                        mobileMenu.classList.add('hidden');
+                        const icon = mobileMenuBtn.querySelector('i');
+                        icon.setAttribute('data-lucide', 'menu');
+                        lucide.createIcons();
+                    });
+                });
+            }
+
+            // 1. Process Command Logic (Shared for Voice & Text Fallback)
+            const processCommand = (cmd) => {
+                if (!cmd) return;
+                const transcript = cmd.toLowerCase();
+                console.log("Command:", transcript);
+                
+                let target = "";
+                if (transcript.includes('login') || transcript.includes('log in')) target = 'login.html';
+                else if (transcript.includes('v1') || transcript.includes('one')) target = 'v1.html';
+                else if (transcript.includes('v2') || transcript.includes('two') || transcript.includes('poster')) target = 'v2.html';
+                else if (transcript.includes('v3') || transcript.includes('three') || transcript.includes('patient')) target = 'v3.html';
+                else if (transcript.includes('v4') || transcript.includes('four') || transcript.includes('chat')) target = 'v4.html';
+                else if (transcript.includes('v5') || transcript.includes('five') || transcript.includes('rmp')) target = 'v5.html';
+
+                if (target) {
+                    // Visual feedback before redirect
+                    const originalContent = btn.innerHTML;
+                    btn.innerHTML = '<i data-lucide="check" class="w-8 h-8"></i>';
+                    lucide.createIcons();
+                    setTimeout(() => {
+                        window.open(target, '_blank'); 
+                        btn.innerHTML = originalContent;
+                        lucide.createIcons();
+                    }, 500);
+                } else {
+                     alert("Command not recognized. Try 'V1', 'Login', etc.");
+                }
+            };
+
+            // 2. Prompt Fallback Function
+            const triggerPrompt = (msg = "Type command (e.g., V1, Login):") => {
+                const cmd = prompt(msg);
+                processCommand(cmd);
+            };
+
+            // 3. Speech Recognition Setup
+            if ('webkitSpeechRecognition' in window) {
+                const recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    btn.classList.add('voice-active');
+                    btn.style.backgroundColor = '#ef4444'; // Red
+                };
+
+                recognition.onend = () => {
+                    btn.classList.remove('voice-active');
+                    btn.style.backgroundColor = '#2563eb'; // Blue
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    processCommand(transcript);
+                };
+
+                // Robust Error Handling for Mobile
+                recognition.onerror = (event) => {
+                    console.warn("Voice error:", event.error);
+                    btn.classList.remove('voice-active');
+                    btn.style.backgroundColor = '#2563eb';
+                    
+                    // If not allowed or service error (common on mobile), fallback to text
+                    if (event.error === 'not-allowed' || event.error === 'service-not-allowed' || event.error === 'network') {
+                        triggerPrompt("Voice unavailable (" + event.error + "). Type command:");
+                    }
+                };
+
+                btn.addEventListener('click', () => {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.error("Recognition start failed", e);
+                        triggerPrompt();
+                    }
+                });
+            } else {
+                // Fallback for non-supported browsers (e.g. Firefox Mobile, some iOS wrappers)
+                btn.addEventListener('click', () => {
+                    triggerPrompt("Voice API not supported. Type command:");
+                });
+            }
+
+            // 4. Scroll Behavior for Tooltip (Mobile Only)
+            if (tooltip) {
+                const handleScroll = () => {
+                    // IMPORTANT: Check width. If desktop (>768px), ensure we DON'T hide it via class
+                    // This ensures desktop hover behavior works regardless of scroll position.
+                    if (window.innerWidth > 768) {
+                        tooltip.classList.remove('mobile-scroll-hide');
+                        return; 
+                    }
+
+                    const scrollTop = window.scrollY;
+                    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                    const scrollPercent = (scrollTop / docHeight) * 100;
+
+                    if (scrollPercent > 10) {
+                        tooltip.classList.add('mobile-scroll-hide');
+                    } else {
+                        tooltip.classList.remove('mobile-scroll-hide');
+                    }
+                };
+
+                window.addEventListener('scroll', handleScroll);
+                window.addEventListener('resize', handleScroll); // Re-check on resize
+            }
+        };
+
+        // Init
+        window.onload = () => {
+            initThreeJS();
+            initGSAP();
+            initVoiceAssistant();
+        };
+    </script>
+
+
+    
+
+
+   <!-- PATIENT LOGIN SYSTEM -->
+<script>
+    // Read values from URL
+    const params = new URLSearchParams(window.location.search);
+    const username = params.get("user");
+    const role = params.get("role");
+
+    const loginBtn = document.getElementById("doctor-login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+
+    // ---------------- PATIENT LOGIN HEADER ----------------
+    if (username && role === "patient") {
+        const formatted = username.charAt(0).toUpperCase() + username.slice(1) + " (Patient)";
+        loginBtn.innerHTML = formatted;
+        loginBtn.removeAttribute("href");
+        loginBtn.style.cursor = "default";
+
+        logoutBtn.classList.remove("hidden");
+    }
+
+    // PATIENT LOGOUT
+    logoutBtn.addEventListener("click", () => {
+        window.location.href = "patient.html"; // remove parameters
+    });
+</script>
+
+<script>
+    // ---------------- PROTECT V1–V4 MODULES ----------------
+    const userIsPatient = username && role === "patient";
+
+    const protectedLinks = document.querySelectorAll("a[target='_blank']");
+
+    protectedLinks.forEach(link => {
+        link.addEventListener("click", function(event) {
+            if (!userIsPatient) {
+                event.preventDefault();
+                openPopup();
+            }
+        });
+    });
+</script>
+
+
+
+<script>
+    // POPUP functions
+    function openPopup() {
+        document.getElementById("login-popup").classList.remove("hidden");
+        document.getElementById("login-popup").classList.add("flex");
+    }
+
+    function closePopup() {
+        document.getElementById("login-popup").classList.add("hidden");
+    }
+
+    function redirectToLogin() {
+        window.location.href = "login.html";
+    }
+
+    
+</script>
+
+
+<!-- ------------------------------------------------------------ -->
+
+
+<!-- LOGIN REQUIRED POPUP -->
+<div id="login-popup" class="fixed inset-0 hidden items-center justify-center bg-black/70 backdrop-blur-sm z-[9999]">
+    <div class="bg-slate-800/80 p-8 rounded-2xl w-80 text-center border border-white/10 shadow-2xl animate-fade-in">
+        
+        <h2 class="text-2xl font-bold text-blue-400 mb-3">Login Required</h2>
+        
+        <p class="text-gray-300 text-sm mb-6">
+            You must be logged in as a patient to access this module.
+            Please login to continue.
+        </p>
+
+        <button onclick="redirectToLogin()"
+            class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold shadow-lg w-full transition-all">
+            Login Now
+        </button>
+
+        <button onclick="closePopup()"
+            class="mt-3 text-gray-400 hover:text-gray-200 text-xs underline">
+            Cancel
+        </button>
+    </div>
+</div>
+
+
+
+<style>
+@keyframes fade-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+}
+.animate-fade-in { animation: fade-in 0.25s ease-out; }
+</style>
+
+
+</body>
+</html>

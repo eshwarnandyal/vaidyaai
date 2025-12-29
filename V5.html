@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaidya – RMP Doctor Chat Portal (v5 updated)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { 
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top, #0b1220 0%, #020617 45%, #020617 100%);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: radial-gradient(circle at 10% 0%, #0ea5e9 0%, #020617 50%, #020617 100%); }
+        .chat-bubble { position: relative; max-width: 85%; padding: 12px 16px; border-radius: 18px; font-size: 0.95rem; line-height: 1.5; transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease; transform-origin: 90% 100%; }
+        .chat-bubble.sent { background: radial-gradient(circle at 0% 0%, rgba(56,189,248,0.25), transparent 60%), linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); color: white; border-bottom-right-radius: 4px; margin-left: auto; box-shadow: 0 8px 25px rgba(56,189,248,0.35); }
+        .chat-bubble.received { background: radial-gradient(circle at 100% 0%, rgba(20,184,166,0.18), transparent 55%), linear-gradient(135deg, #020617 0%, #020617 60%, #0f172a 100%); color: #e5e7eb; border-bottom-left-radius: 4px; border: 1px solid rgba(148,163,184,0.4); box-shadow: 0 8px 20px rgba(15,23,42,0.9); }
+        .chat-bubble:hover { transform: translateY(-1px) scale(1.01); box-shadow: 0 10px 30px rgba(15,23,42,0.9); }
+        .glass-panel { background: radial-gradient(circle at top, rgba(56,189,248,0.18), transparent 55%), linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.9)); backdrop-filter: blur(18px); border: 1px solid rgba(148,163,184,0.25); }
+        .recording-active { border-color: #ef4444 !important; box-shadow: 0 0 0 1px rgba(248,113,113,0.3); background: radial-gradient(circle at 0 0, rgba(248,113,113,0.1), transparent 55%) !important; }
+        .wave-bar { background-color: #ef4444; animation: soundWave 0.5s ease-in-out infinite alternate; }
+        .wave-bar:nth-child(1) { animation-delay: 0.1s; height: 40%; }
+        .wave-bar:nth-child(2) { animation-delay: 0.2s; height: 80%; }
+        .wave-bar:nth-child(3) { animation-delay: 0.3s; height: 50%; }
+        .wave-bar:nth-child(4) { animation-delay: 0.1s; height: 90%; }
+        .wave-bar:nth-child(5) { animation-delay: 0.2s; height: 60%; }
+        @keyframes soundWave { 0% { transform: scaleY(0.5); } 100% { transform: scaleY(1.2); } }
+        .notification-blink { animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-dark-950 h-screen flex overflow-hidden text-slate-200">
+
+    <!-- Optional sound cues (replace src with your own soft UI sounds) -->
+    <audio id="send-sound" src="send.mp3" preload="auto"></audio>
+    <audio id="receive-sound" src="receive.mp3" preload="auto"></audio>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="file-upload" class="hidden" />
+
+    <!-- Sidebar -->
+    <aside class="w-full md:w-80 lg:w-96 bg-gradient-to-b from-dark-900/95 to-slate-900/95 border-r border-slate-800/80 flex flex-col h-full z-10 shadow-2xl shadow-sky-900/30 transition-all duration-300 absolute md:relative" id="sidebar">
+        <!-- Top Auth Bar -->
+        <div class="px-5 py-2 bg-dark-900/90 border-b border-slate-800 flex justify-between items-center text-xs font-medium">
+            <span class="inline-flex items-center gap-1 text-slate-500">
+                <i data-lucide="activity" class="w-3 h-3 text-medical-500"></i>
+                <span class="uppercase tracking-[0.18em] text-[9px]">Dr. Connect</span>
+            </span>
+            <div class="flex items-center gap-3">
+                <a href="login.html" onclick="handleLogout(event)" class="text-medical-500 hover:text-medical-400 transition-colors">RMP Login</a>
+                <span class="text-slate-700">|</span>
+                <button onclick="openSupport()" class="text-slate-400 hover:text-white transition-colors">Support</button>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="p-5 border-b border-slate-800 bg-gradient-to-br from-slate-950/70 via-slate-900/80 to-slate-900/60">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-medical-500 via-sky-500 to-accent-500 flex items-center justify-center text-white shadow-xl hero-holo-ring">
+                    <div class="absolute inset-0 rounded-2xl border border-sky-200/20"></div>
+                    <i data-lucide="stethoscope" class="w-6 h-6 animate-heartbeat"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-[1.1rem] text-slate-50 tracking-tight">
+                        Vaidya  – RMP Portal
+                    </h1>
+                    <p class="text-[10px] uppercase tracking-[0.22em] text-medical-500 font-semibold">
+                        Registered Medical Practitioner
+                    </p>
+                </div>
+            </div>
+
+            <!-- Search & Voice Command -->
+            <div class="relative group flex items-center gap-2 mt-4">
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-medical-500 transition-colors"></i>
+                    <input type="text" id="search-input" placeholder="Search your RMP network..." 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-medical-500 focus:border-medical-500 transition-all shadow-inner shadow-slate-950/60">
+                </div>
+                <button onclick="startVoiceSearch()" id="voice-search-btn" class="p-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-slate-400 hover:text-medical-400 hover:border-medical-500 transition-all relative group/mic" title="Voice Search (e.g., 'Dr. Arjun')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="mic" class="lucide lucide-mic w-5 h-5"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+                    <span id="voice-search-listening" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Doctor List (this will become RMP list under the logged-in doctor) -->
+        <div class="flex-1 overflow-y-auto p-2 space-y-1 bg-gradient-to-b from-slate-950/70 to-slate-950" id="doctor-list">
+            <!-- Fetched from Firebase (RMPs under the doctor's rmpNetwork) -->
+        </div>
+
+        <!-- User Profile Footer -->
+        <div class="p-4 border-t border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 flex items-center justify-between">
+            <div class="flex items-center gap-3 cursor-pointer hover:bg-slate-900/80 px-2 py-1 rounded-lg transition-colors" onclick="openMyProfile()">
+                <div class="relative">
+                    <img id="footer-avatar" src="https://ui-avatars.com/api/?name=RMP+Dr+You&background=020617&color=38bdf8&rounded=true&size=128" alt="My Profile" class="w-10 h-10 rounded-full border border-sky-500/50 shadow-md shadow-sky-900/70">
+                    <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-accent-500 border-2 border-dark-900 rounded-full"></span>
+                </div>
+                <div>
+                    <p id="footer-user-name" class="text-sm font-bold text-slate-100">RMP Dr. You</p>
+                    <p id="footer-user-spec" class="text-[11px] text-slate-400">Rural Health & Primary Care</p>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="flex items-center gap-1">
+                <button onclick="toggleNotifications()" class="p-2 hover:bg-slate-900 rounded-full text-slate-400 transition-all relative">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <div class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-dark-900 notification-blink"></div>
+                </button>
+                <button onclick="openSettings()" class="p-2 hover:bg-slate-900 rounded-full text-slate-400 transition-all">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="flex-1 flex flex-col h-full relative bg-dark-950">
+        <!-- 3D Background Hero / Empty State -->
+        <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center z-0 overflow-hidden">
+            <div id="canvas-container"></div>
+            <!-- Overlay -->
+            <div class="z-10 text-center p-8 glass-panel rounded-3xl shadow-[0_40px_120px_rgba(15,23,42,0.95)] max-w-md mx-4 animate-slide-up pointer-events-none select-none relative">
+                <div class="hero-holo absolute inset-[-1px] rounded-3xl opacity-70 animate-shimmer-soft mix-blend-screen"></div>
+                <div class="relative">
+                    <div class="w-24 h-24 bg-slate-900/80 text-medical-500 rounded-[1.4rem] flex items-center justify-center mx-auto mb-6 border border-sky-500/40 shadow-2xl shadow-sky-900/60 hero-holo-ring">
+                        <i data-lucide="stethoscope" class="w-10 h-10 animate-heartbeat"></i>
+                    </div>
+                    <h2 class="text-3xl md:text-4xl font-bold text-slate-50 mb-2 tracking-tight">
+                        Vaidya
+                    </h2>
+                    <p class="text-[12px] uppercase tracking-[0.3em] text-medical-400 mb-4">
+                        RMP Doctor's Chat Portal
+                    </p>
+                    <p class="text-slate-300 mb-4 leading-relaxed text-sm">
+                        Step into your own intelligent, secure <span class="text-medical-400 font-semibold">digital clinic</span>.
+                        Chat with patients, review cases, and coordinate care from one calm, futuristic space.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div id="chat-interface" class="hidden flex-col h-full z-20 glass-panel absolute inset-0 transition-all">
+            <!-- Header -->
+            <header class="h-18 py-3 px-4 md:px-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/95 backdrop-blur-xl">
+                <div class="flex items-center gap-3">
+                    <button id="back-btn" class="md:hidden p-2 hover:bg-slate-900 rounded-full text-slate-400 transition-colors">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <div class="flex items-center gap-3 cursor-pointer hover:bg-slate-900/70 p-1.5 rounded-lg transition-colors group" onclick="showDoctorProfile()">
+                        <div class="relative">
+                            <img id="chat-header-avatar" src="" class="w-11 h-11 rounded-full border-2 border-sky-500/50 bg-slate-900 object-cover shadow-md shadow-sky-900/60">
+                            <span class="absolute bottom-0 right-0 w-3 h-3 bg-accent-500 border-2 border-dark-900 rounded-full"></span>
+                        </div>
+                        <div>
+                            <h3 id="chat-header-name" class="font-semibold text-slate-50 leading-tight text-[0.98rem] group-hover:text-medical-400 transition-colors"></h3>
+                            <p id="chat-header-spec" class="text-[11px] text-medical-400 font-semibold bg-medical-500/10 px-2 py-0.5 rounded-md inline-block mt-0.5 border border-medical-500/30"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 relative">
+                    <div class="relative">
+                        <button onclick="toggleNotifications()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-medical-400 hover:bg-slate-900 rounded-full transition-all relative">
+                            <i data-lucide="bell" class="w-5 h-5"></i>
+                            <div id="notif-badge" class="hidden absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-dark-900 notification-blink"></div>
+                        </button>
+                    </div>
+                    <div class="w-px h-6 bg-slate-700 mx-1"></div>
+                    <button id="audio-call-btn" onclick="startCall('audio')" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-medical-400 hover:bg-slate-900 rounded-full transition-all" title="Audio Call">
+                        <i data-lucide="phone" class="w-5 h-5"></i>
+                    </button>
+                    <button id="video-call-btn" onclick="startCall('video')" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-medical-400 hover:bg-slate-900 rounded-full transition-all" title="Video Call">
+                        <i data-lucide="video" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Messages -->
+            <div id="messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth bg-gradient-to-b from-slate-950 via-slate-950 to-slate-950 relative">
+                <div class="flex justify-center py-6">
+                    <div class="bg-emerald-500/10 text-emerald-400 text-xs px-4 py-2 rounded-full border border-emerald-500/30 flex items-center gap-2">
+                        <i data-lucide="lock" class="w-3 h-3"></i> 
+                        <span>End-to-end encrypted. RMP chats are secured.</span>
+                    </div>
+                </div>
+                <div id="typing-indicator" class="hidden w-full">
+                    <div class="flex items-end gap-2">
+                        <div class="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] text-slate-300">
+                            <i data-lucide="stethoscope" class="w-3 h-3"></i>
+                        </div>
+                        <div class="chat-bubble received flex items-center gap-1 max-w-[120px]">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Input -->
+            <footer class="p-4 bg-slate-950/95 border-t border-slate-800">
+                <div class="flex items-end gap-3 max-w-5xl mx-auto relative">
+                    <button onclick="triggerFileUpload()" class="p-3 text-slate-400 hover:text-medical-400 hover:bg-slate-900 rounded-2xl transition-all flex-shrink-0">
+                        <i data-lucide="paperclip" class="w-5 h-5"></i>
+                    </button>
+                    <div id="input-wrapper" class="flex-1 bg-slate-900 rounded-2xl flex items-center p-1.5 focus-within:ring-2 focus-within:ring-medical-500/50 transition-all border border-slate-700 focus-within:border-medical-500 relative overflow-hidden">
+                        <div id="recording-wave" class="absolute inset-0 bg-slate-950/90 flex items-center justify-center gap-1 hidden z-10">
+                             <span class="text-xs text-red-500 font-bold mr-3 animate-pulse tracking-[0.25em] uppercase">Recording</span>
+                             <div class="wave-bar w-1 h-3 rounded-full"></div>
+                             <div class="wave-bar w-1 h-5 rounded-full"></div>
+                             <div class="wave-bar w-1 h-4 rounded-full"></div>
+                             <div class="wave-bar w-1 h-6 rounded-full"></div>
+                             <div class="wave-bar w-1 h-3 rounded-full"></div>
+                        </div>
+                        <textarea id="message-input" rows="1" placeholder="Type a calm, clear message to your patient..." class="w-full bg-transparent border-none focus:ring-0 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 resize-none max-h-32 leading-relaxed" style="min-height: 24px;"></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="voice-note-btn" onclick="toggleRecording()" class="p-3 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-2xl transition-all flex-shrink-0 relative z-20">
+                            <i data-lucide="mic" class="w-5 h-5"></i>
+                        </button>
+                        <button id="send-btn" onclick="handleSendClick()" class="p-3 bg-gradient-to-br from-medical-600 to-medical-500 hover:from-medical-500 hover:to-medical-400 text-white rounded-2xl shadow-lg shadow-sky-900/60 transition-all flex-shrink-0 transform active:scale-95 z-20">
+                            <i data-lucide="send-horizontal" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </main>
+
+    <!-- Firebase + App Logic (updated to list RMPs under the logged-in doctor and support chat, file & voice-note upload) -->
+    <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+    import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+    import { getFirestore, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, where } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js';
+
+    // Use your firebase config here (replace the placeholder)
+    const firebaseConfig = {
+      apiKey: "AIzaSyDozLLKWzMHLC8nNnvKrZTwEgvLuCt2re0",
+      authDomain: "vidyaaai.firebaseapp.com",
+      projectId: "vidyaaai",
+      storageBucket: "vidyaaai.firebasestorage.app",
+      messagingSenderId: "920193754336",
+      appId: "1:920193754336:web:ff01c0cfe91b3b42a21c85"
+
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // Local identity for the RMP (keeps footer unchanged)
+    const LOCAL_USER_KEY = 'vaidyai_local_user';
+    let currentUser = JSON.parse(localStorage.getItem(LOCAL_USER_KEY) || 'null');
+    if (!currentUser) {
+      currentUser = { id: 'rmp_' + Math.random().toString(36).slice(2,9), name: 'RMP Dr. You', spec: 'Rural Health & Primary Care (RMP)' };
+      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(currentUser));
+    }
+
+    // DOM refs
+    const els = {
+      list: document.getElementById('doctor-list'),
+      chat: document.getElementById('chat-interface'),
+      empty: document.getElementById('empty-state'),
+      msgs: document.getElementById('messages-container'),
+      input: document.getElementById('message-input'),
+      footerName: document.getElementById('footer-user-name'),
+      footerSpec: document.getElementById('footer-user-spec'),
+      footerAvatar: document.getElementById('footer-avatar'),
+      chatHeaderName: document.getElementById('chat-header-name'),
+      chatHeaderSpec: document.getElementById('chat-header-spec'),
+      chatHeaderAvatar: document.getElementById('chat-header-avatar'),
+      recordingWave: document.getElementById('recording-wave')
+    };
+
+    // apply footer
+    els.footerName.innerText = currentUser.name;
+    els.footerSpec.innerText = currentUser.spec;
+    els.footerAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name)}&background=020617&color=38bdf8&rounded=true&size=128`;
+
+    // runtime state
+    let rmpList = [];
+    let activeRmp = null;
+    let messagesUnsub = null;
+    let rmpListenerUnsub = null;
+
+    // chat id helper
+    function chatIdFor(a,b){ return [String(a),String(b)].sort().join('_'); }
+
+    // render RMP list in left panel
+    function renderDoctors(filter=''){
+      els.list.innerHTML = '';
+      const filtered = rmpList.filter(d => (d.name||'').toLowerCase().includes(filter.toLowerCase()) || (d.location||'').toLowerCase().includes(filter.toLowerCase()));
+      if(filtered.length === 0){
+        const el = document.createElement('div');
+        el.className = 'p-3 text-sm text-slate-500';
+        el.innerText = 'No RMPs in your network.';
+        els.list.appendChild(el);
+        if(window.lucide) lucide.createIcons();
+        return;
+      }
+      filtered.forEach(r => {
+        const div = document.createElement('div');
+        div.className = `p-3 rounded-xl cursor-pointer transition-all mb-1 flex items-center gap-3 border ${activeRmp && activeRmp.id===r.id ? 'bg-sky-500/10 border-sky-500/30 shadow-md shadow-sky-900/60' : 'hover:bg-slate-900 border-transparent'}`;
+        div.onclick = () => openChatWithRmp(r);
+        div.innerHTML = `
+          <div class="relative">
+            <img src="${escapeHtml(r.avatar || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(r.name) + '&background=020617&color=38bdf8&rounded=true&size=128'))}" class="w-12 h-12 rounded-full bg-slate-900 object-cover border border-slate-700 shadow-sm shadow-slate-900/70">
+            ${r.online ? '<span class="absolute bottom-0 right-0 w-3 h-3 bg-accent-500 border-2 border-dark-900 rounded-full"></span>' : ''}
+          </div>
+          <div class="flex-1 overflow-hidden">
+            <h4 class="font-semibold text-slate-100 truncate text-sm">${escapeHtml(r.name)}</h4>
+            <p class="text-[11px] text-medical-400 truncate">${escapeHtml(r.location || r.spec || '')}</p>
+          </div>
+        `;
+        els.list.appendChild(div);
+      });
+      if(window.lucide) lucide.createIcons();
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+
+    // open chat with selected RMP
+    async function openChatWithRmp(r){
+      activeRmp = r;
+      els.empty.classList.add('hidden');
+      els.chat.classList.remove('hidden');
+      els.chat.classList.add('flex');
+      els.chatHeaderName.textContent = r.name;
+      els.chatHeaderSpec.textContent = r.spec || r.location || '';
+      els.chatHeaderAvatar.src = r.avatar || (`https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=020617&color=38bdf8&rounded=true&size=128`);
+
+      // unsubscribe previous
+      if(messagesUnsub) { try{ messagesUnsub(); }catch(e){} messagesUnsub = null; }
+      els.msgs.innerHTML = '';
+
+      if(db){
+        const cid = chatIdFor(currentUser.id, r.id);
+        const msgsRef = collection(db, 'chats', cid, 'messages');
+        const q = query(msgsRef, orderBy('ts'));
+        messagesUnsub = onSnapshot(q, snap => {
+          els.msgs.innerHTML = '';
+          // lock notice
+          const notice = document.createElement('div');
+          notice.className = 'flex justify-center py-6';
+          notice.innerHTML = `<div class="bg-emerald-500/10 text-emerald-400 text-xs px-4 py-2 rounded-full border border-emerald-500/30 flex items-center gap-2"><i data-lucide="lock" class="w-3 h-3"></i><span>End-to-end encrypted. RMP chats are secured.</span></div>`;
+          els.msgs.appendChild(notice);
+
+          snap.forEach(s=>{
+            const m = s.data();
+            if(m.isAudio && m.fileUrl){
+              addAudioMessageToUI(m.from === currentUser.id ? 'sent':'received', m.fileUrl, m.ts && m.ts.toDate ? m.ts.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '');
+            } else if(m.fileName && m.fileUrl){
+              addFileMessageToUI(m.from === currentUser.id ? 'sent':'received', m.fileName, m.fileUrl, m.ts && m.ts.toDate ? m.ts.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '');
+            } else {
+              addMessageToUI({ type: m.from === currentUser.id ? 'sent':'received', text: m.text || '', time: m.ts && m.ts.toDate ? m.ts.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '' });
+            }
+          });
+          if(window.lucide) lucide.createIcons();
+          els.msgs.scrollTop = els.msgs.scrollHeight;
+        }, err=>{ console.error('chat onSnapshot error', err); });
+      }
+    }
+
+    function addMessageToUI(msg){
+      const div = document.createElement('div');
+      div.className = `chat-bubble ${msg.type} animate-slide-up flex flex-col mb-4`;
+      const span = document.createElement('span'); span.textContent = msg.text || '';
+      div.appendChild(span);
+      const time = document.createElement('div'); time.className='text-[10px] opacity-60 mt-1 text-right'; time.textContent = msg.time || '';
+      div.appendChild(time);
+      els.msgs.appendChild(div);
+    }
+
+    function addAudioMessageToUI(type, audioUrl, time){
+      const div = document.createElement('div'); div.className = `chat-bubble ${type} animate-slide-up flex flex-col mb-4`;
+      const wrapper = document.createElement('div'); wrapper.className='flex items-center gap-3';
+      const btn = document.createElement('button'); btn.className='p-2.5 rounded-full bg-white/10'; btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i>';
+      const audio = document.createElement('audio'); audio.src = audioUrl; audio.controls = true; audio.style.maxWidth='220px';
+      btn.onclick = ()=> { try{ if(audio.paused) audio.play(); else audio.pause(); } catch(e){} };
+      wrapper.appendChild(btn); wrapper.appendChild(audio);
+      div.appendChild(wrapper);
+      const t = document.createElement('div'); t.className='text-[10px] opacity-60 mt-1 text-right'; t.textContent = time||''; div.appendChild(t);
+      els.msgs.appendChild(div);
+      if(window.lucide) lucide.createIcons();
+    }
+
+    function addFileMessageToUI(type, name, url, time){
+      const div = document.createElement('div'); div.className = `chat-bubble ${type} animate-slide-up flex flex-col mb-4`;
+      const a = document.createElement('a'); a.href = url; a.target='_blank'; a.rel='noopener'; a.textContent = name; a.className='underline';
+      div.appendChild(a);
+      const t = document.createElement('div'); t.className='text-[10px] opacity-60 mt-1 text-right'; t.textContent = time||''; div.appendChild(t);
+      els.msgs.appendChild(div);
+    }
+
+    // send text message
+    async function sendMessageToChat(text){
+      if(!activeRmp) return alert('Select an RMP first');
+      const cid = chatIdFor(currentUser.id, activeRmp.id);
+      const payload = { from: currentUser.id, text: text, ts: serverTimestamp() };
+      try{ await addDoc(collection(db, 'chats', cid, 'messages'), payload); try{ els.sendSound && els.sendSound.play(); }catch(e){} }catch(e){ console.error('send failed', e); }
+    }
+
+    // send file (upload to storage then message)
+    document.getElementById('file-upload').addEventListener('change', async (ev)=>{
+      const f = ev.target.files && ev.target.files[0]; if(!f) return;
+      if(!activeRmp) return alert('Select an RMP first');
+      const cid = chatIdFor(currentUser.id, activeRmp.id);
+      const path = `chats/${cid}/files/${Date.now()}_${f.name}`;
+      try{
+        const sref = storageRef(storage, path);
+        const snap = await uploadBytes(sref, f);
+        const url = await getDownloadURL(sref);
+        await addDoc(collection(db, 'chats', cid, 'messages'), { from: currentUser.id, fileName: f.name, fileUrl: url, ts: serverTimestamp() });
+      }catch(e){ console.error('file upload failed', e); alert('File upload failed'); }
+      ev.target.value = '';
+    });
+
+    // voice recording (MediaRecorder -> upload -> send message with fileUrl and isAudio flag)
+    let mediaRecorder = null, audioChunks = [];
+    async function toggleRecording(){
+      if(mediaRecorder && mediaRecorder.state === 'recording') { await stopRecordingAndSend(); return; }
+      // start
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        mediaRecorder.ondataavailable = e => { if(e.data && e.data.size) audioChunks.push(e.data); };
+        mediaRecorder.onstop = async ()=>{
+          const blob = new Blob(audioChunks, { type: 'audio/webm' });
+          // upload
+          if(!activeRmp) { alert('Select an RMP first'); return; }
+          const cid = chatIdFor(currentUser.id, activeRmp.id);
+          const fname = `voice_${Date.now()}.webm`;
+          const path = `chats/${cid}/voice/${fname}`;
+          try{
+            const sref = storageRef(storage, path);
+            await uploadBytes(sref, blob);
+            const url = await getDownloadURL(sref);
+            await addDoc(collection(db, 'chats', cid, 'messages'), { from: currentUser.id, isAudio: true, fileUrl: url, fileName: fname, ts: serverTimestamp() });
+          }catch(e){ console.error('voice upload failed', e); alert('Voice upload failed'); }
+        };
+        mediaRecorder.start();
+        if(els.recordingWave) els.recordingWave.classList.remove('hidden');
+      }catch(e){ console.error('mic start failed', e); alert('Microphone access denied or unavailable'); }
+    }
+
+    async function stopRecordingAndSend(){
+      try{ if(mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop(); if(els.recordingWave) els.recordingWave.classList.add('hidden'); }catch(e){ console.warn(e); }
+    }
+
+    // wire send button & enter
+    document.getElementById('send-btn').addEventListener('click', async ()=>{
+      const txt = els.input.value.trim(); if(!txt) return; await sendMessageToChat(txt); els.input.value = '';
+    });
+    els.input.addEventListener('keypress', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('send-btn').click(); } });
+
+    // search handler
+    let searchDebounce;
+    document.getElementById('search-input').addEventListener('input', (e)=>{ clearTimeout(searchDebounce); searchDebounce = setTimeout(()=> renderDoctors(e.target.value), 160); });
+
+    // Subscribe to RMPs under the logged-in doctor's "rmpNetwork" collection.
+    // Determine doctorId from Firebase Auth when available (prefer real authenticated user),
+    // otherwise fallback to a locally stored 'vaidya_doctor_id' for dev/testing.
+    let currentDoctorId = localStorage.getItem('vaidya_doctor_id') || null;
+
+    async function subscribeRmpNetwork(doctorId){
+      // cleanup
+      if(rmpListenerUnsub){ try{ rmpListenerUnsub(); }catch(e){} rmpListenerUnsub = null; }
+      rmpList = [];
+      renderDoctors();
+      if(!doctorId) return;
+      try{
+        const col = collection(db, 'doctors', doctorId, 'rmpNetwork');
+        const q = query(col, orderBy('name'));
+        rmpListenerUnsub = onSnapshot(q, snap=>{
+          rmpList = [];
+          snap.forEach(d=>{
+            const data = d.data() || {};
+            rmpList.push({ id: d.id, name: data.name || data.fullName || ('RMP '+d.id.slice(0,6)), spec: data.specialty || data.spec || '', location: data.location || '', avatar: data.avatar || '', online: !!data.online });
+          });
+          renderDoctors(document.getElementById('search-input')?.value || '');
+        }, err=>{ console.error('rmpNetwork onSnapshot error', err); });
+      }catch(e){ console.error('subscribeRmpNetwork failed', e); }
+    }
+
+    // Auth: sign in anonymously to obtain an auth uid (useful to map doctor session). If the deploy uses real auth replace this.
+    signInAnonymously(auth).catch(err=>console.warn('anon sign-in failed', err));
+    onAuthStateChanged(auth, async (user)=>{
+      if(user){
+        // Prefer a real authenticated (non-anonymous) user id so the UI shows RMPs
+        // for the doctor who actually signed in. If the user is anonymous and a
+        // local override exists, keep it — otherwise use the anonymous uid.
+        try{
+          if(!user.isAnonymous) {
+            // a real signed-in doctor: always use this id
+            currentDoctorId = user.uid;
+            localStorage.setItem('vaidya_doctor_id', currentDoctorId);
+          } else if(!currentDoctorId) {
+            // anonymous fallback (only if no local override)
+            currentDoctorId = user.uid;
+            localStorage.setItem('vaidya_doctor_id', currentDoctorId);
+          }
+        }catch(e){
+          // defensive: if property not present, fallback to uid
+          currentDoctorId = user.uid;
+          localStorage.setItem('vaidya_doctor_id', currentDoctorId);
+        }
+
+        // subscribe rmpNetwork for this doctor id
+        subscribeRmpNetwork(currentDoctorId);
+      } else {
+        // no user: still attempt to subscribe if local doctor id present
+        if(currentDoctorId) subscribeRmpNetwork(currentDoctorId);
+      }
+    });
+
+    // If you want to change which doctor is being viewed in the UI without auth, set localStorage 'vaidya_doctor_id' and call subscribeRmpNetwork(newId).
+
+    // Firestore fallback: if no DB or empty collection, keep list empty (no predetermined data shown)
+
+    // simple call stub: attempt to open browser's tel: or start WebRTC (placeholder). Keep UI unchanged.
+    function startCall(type){
+      if(!activeRmp) return alert('Select an RMP to call');
+      // Placeholder behaviour — integrate your WebRTC/Signaling here
+      alert(`${type.toUpperCase()} call requested with ${activeRmp.name}. Implement WebRTC signaling on server to enable live calls.`);
+    }
+
+    window.startVoiceSearch = function() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { alert("Voice search not supported in your browser."); return; }
+      
+      const recognition = new SpeechRecognition();
+      const indicator = document.getElementById('voice-search-listening');
+      const searchInput = document.getElementById('search-input');
+      
+      recognition.onstart = () => { 
+        indicator.classList.remove('hidden'); 
+      };
+      
+      recognition.onend = () => { 
+        indicator.classList.add('hidden'); 
+      };
+      
+      recognition.onresult = (event) => {
+        const transcript = (event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript) ? event.results[0][0].transcript : '';
+        const searchTerm = transcript.toLowerCase().trim();
+        
+        if (searchInput) {
+          searchInput.value = searchTerm;
+          renderDoctors(searchTerm);
+        }
+      };
+      
+      recognition.onerror = (event) => {
+        console.error('Voice search error:', event.error);
+        alert('Voice search error: ' + event.error);
+      };
+      
+      recognition.start();
+    };
+
+    function triggerFileUpload(){ document.getElementById('file-upload').click(); }
+    function handleLogout(e){ if(e) e.preventDefault(); try{ window.location.href='login.html'; }catch(err){ alert('Logged out'); } }
+    function openSupport(){ alert('Support: please configure support contact.'); }
+    function toggleNotifications(){ const nd = document.getElementById('notif-dropdown'); if(nd) nd.classList.toggle('hidden'); }
+    function openSettings(){ alert('Open settings (not implemented)'); }
+    function startVoiceCommand(){ alert('Voice-commands not implemented in this build.'); }
+
+    // Three.js visual (unchanged)
+    function initThree(){ const container = document.getElementById('canvas-container'); if(!container) return; const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(65, container.clientWidth/container.clientHeight, 0.1, 1000); const renderer = new THREE.WebGLRenderer({alpha:true,antialias:true}); renderer.setSize(container.clientWidth, container.clientHeight); container.appendChild(renderer.domElement); const particlesGeometry = new THREE.BufferGeometry(); const particlesCount = 400; const posArray = new Float32Array(particlesCount * 3); for (let i = 0; i < particlesCount * 3; i++) posArray[i] = (Math.random()-0.5)*35; particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray,3)); const particlesMaterial = new THREE.PointsMaterial({ size:0.06, color:0x38bdf8, transparent:true, opacity:0.65 }); const particles = new THREE.Points(particlesGeometry, particlesMaterial); scene.add(particles); const holoMaterial = new THREE.MeshPhongMaterial({ color:0x22c55e, emissive:0x22c55e, wireframe:true, transparent:true, opacity:0.55 }); const holoCore = new THREE.Mesh(new THREE.TorusKnotGeometry(2.2,0.45,120,16), holoMaterial); scene.add(holoCore); const network = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(5.5,1)), new THREE.LineBasicMaterial({ color:0x1e293b, transparent:true, opacity:0.25 })); scene.add(network); const pointLight = new THREE.PointLight(0x38bdf8,1.4,40); pointLight.position.set(4,6,6); scene.add(pointLight); const pointLight2 = new THREE.PointLight(0x14b8a6,1.1,40); pointLight2.position.set(-6,-4,-6); scene.add(pointLight2); camera.position.z = 13; const controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping=true; controls.autoRotate=true; controls.autoRotateSpeed=1.0; controls.enableZoom=false; controls.enablePan=false; let cursorX=0,cursorY=0; window.addEventListener('mousemove', e => { const rect = container.getBoundingClientRect(); const x = (e.clientX-rect.left)/rect.width; const y = (e.clientY-rect.top)/rect.height; cursorX = (x-0.5)*0.4; cursorY = (y-0.5)*0.3; }); function animate(){ requestAnimationFrame(animate); particles.rotation.y += 0.0015; network.rotation.x += 0.001; holoCore.rotation.y += 0.004; holoCore.rotation.x += 0.002; camera.position.x += (cursorX*10 - camera.position.x)*0.03; camera.position.y += (-cursorY*8 - camera.position.y)*0.03; camera.lookAt(0,0,0); controls.update(); renderer.render(scene,camera); } animate(); window.addEventListener('resize', ()=>{ camera.aspect = container.clientWidth/container.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); }); }
+    initThree();
+
+    window.addEventListener('load', ()=>{ if(window.lucide) lucide.createIcons(); });
+
+    // export for debugging
+    window.__VAIDYA_V5 = { subscribeRmpNetwork, openChatWithRmp, sendMessageToChat, toggleRecording };
+    </script>
+</body>
+</html>

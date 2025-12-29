@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Vaidya AI | Specialist Network</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- (Tailwind config & CSS — unchanged from your original file) -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        dark: {800: '#1e293b',900: '#0f172a',950: '#020617'},
+                        medical: {500:'#0ea5e9',600:'#0284c7',700:'#0369a1'},
+                        accent: {500:'#10b981'}
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'scale-in': 'scaleIn 0.2s ease-out',
+                        'pop': 'pop 0.3s ease-out',
+                        'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                    },
+                    keyframes: {
+                        fadeIn: {'0%': {opacity: '0'}, '100%': {opacity: '1'}},
+                        slideUp: {'0%': {transform: 'translateY(20px)', opacity:'0'}, '100%': {transform:'translateY(0)', opacity:'1'}},
+                        scaleIn: {'0%': {transform: 'scale(0.9)', opacity:'0'}, '100%': {transform:'scale(1)', opacity:'1'}},
+                        pop: {'0%': {transform:'scale(1)'}, '50%': {transform:'scale(1.2)'}, '100%': {transform:'scale(1)'}}
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+    /* (The same CSS from your original file — kept intact) */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    #canvas-container { position: absolute; top:0; left:0; width:100%; height:100%; z-index:0; background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); }
+    .chat-bubble { position: relative; max-width: 85%; padding: 12px 16px; border-radius: 16px; font-size: 0.95rem; line-height: 1.5; transition: all 0.2s; }
+    .chat-bubble.sent { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; border-bottom-right-radius: 4px; margin-left: auto; box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2); }
+    .chat-bubble.received { background-color: #1e293b; color: #e2e8f0; border-bottom-left-radius: 4px; border: 1px solid #334155; }
+    .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+    .recording-active { border-color: #ef4444 !important; background-color: rgba(239, 68, 68, 0.05) !important; }
+    .wave-bar { background-color: #ef4444; animation: soundWave 0.5s ease-in-out infinite alternate; }
+    .wave-bar:nth-child(1) { animation-delay: 0.1s; height: 40%; }
+    .wave-bar:nth-child(2) { animation-delay: 0.2s; height: 80%; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; height: 50%; }
+    .wave-bar:nth-child(4) { animation-delay: 0.1s; height: 90%; }
+    .wave-bar:nth-child(5) { animation-delay: 0.2s; height: 60%; }
+    @keyframes soundWave { 0% { transform: scaleY(0.5);} 100% { transform: scaleY(1.2);} }
+    .notification-blink { animation: blink 1.5s infinite; } @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    .checkmark-circle{ stroke-dasharray:166; stroke-dashoffset:166; stroke-width:2; stroke-miterlimit:10; stroke:#10b981; fill:none; animation: stroke 0.6s cubic-bezier(0.65,0,0.45,1) forwards; } 
+    .checkmark{ width:56px; height:56px; border-radius:50%; display:block; stroke-width:2; stroke:#fff; stroke-miterlimit:10; margin:10% auto; box-shadow: inset 0 0 0 #10b981; animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both; }
+    .checkmark-check{ transform-origin:50% 50%; stroke-dasharray:48; stroke-dashoffset:48; animation: stroke 0.3s cubic-bezier(0.65,0,0.45,1) 0.8s forwards; }
+    @keyframes stroke { 100% { stroke-dashoffset:0; } }
+    @keyframes scale { 0%,100%{transform:none} 50%{ transform: scale3d(1.1,1.1,1);} }
+    @keyframes fill { 100%{ box-shadow: inset 0px 0px 0px 30px #10b981; } }
+    </style>
+</head>
+<body class="bg-dark-950 h-screen flex overflow-hidden text-slate-200">
+
+    <!-- Hidden File Input -->
+    <input type="file" id="file-upload" class="hidden" />
+
+    <!-- Sidebar -->
+    <aside class="w-full md:w-80 lg:w-96 bg-dark-900 border-r border-slate-800 flex flex-col h-full z-10 shadow-2xl transition-all duration-300 absolute md:relative" id="sidebar">
+        <!-- Top Auth Bar -->
+        <div class="px-5 py-2 bg-dark-950 border-b border-slate-800 flex justify-end gap-3 text-xs font-medium">
+            <a href="login.html" onclick="handleLogout(event)" class="text-medical-500 hover:text-medical-400 transition-colors">Doctor Login</a>
+            <span class="text-slate-600">|</span>
+            <button onclick="openSupport()" class="text-slate-400 hover:text-white transition-colors">Support</button>
+        </div>
+
+        <!-- Header -->
+        <div class="p-5 border-b border-slate-800 bg-dark-900">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-medical-500 to-medical-700 flex items-center justify-center text-white shadow-lg shadow-medical-500/20">
+                    <i data-lucide="activity" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-xl text-white tracking-tight">Vaidya AI</h1>
+                    <p class="text-[10px] uppercase tracking-wider text-medical-500 font-bold">Physician Portal</p>
+                </div>
+            </div>
+            
+            <!-- Search & Voice Command -->
+            <div class="relative group flex items-center gap-2">
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-medical-500 transition-colors"></i>
+                    <input type="text" id="search-input" placeholder="Search specialists..." 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-medical-500 focus:border-medical-500 transition-all">
+                </div>
+                <button onclick="startVoiceSearch()" id="voice-search-btn" class="p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 hover:text-medical-500 hover:border-medical-500 transition-all relative group/mic" title="Voice Search (e.g., 'Dr. Verma')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="mic" class="lucide lucide-mic w-5 h-5"><path d="M12 19v3"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><rect x="9" y="2" width="6" height="13" rx="3"></rect></svg>
+                    <span id="voice-search-listening" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Doctor List -->
+        <div class="flex-1 overflow-y-auto p-2 space-y-1" id="doctor-list">
+            <!-- Generated JS List -->
+        </div>
+
+        <!-- User Profile Footer -->
+        <div class="p-4 border-t border-slate-800 bg-dark-900 flex items-center justify-between">
+            <div class="flex items-center gap-3 cursor-pointer hover:bg-slate-800/50 p-1 rounded-lg transition-colors" onclick="openMyProfile()">
+                <div class="relative">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=DrYou&backgroundColor=1e293b" alt="My Profile" class="w-10 h-10 rounded-full border border-slate-600" id="footer-avatar">
+                    <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-accent-500 border-2 border-dark-900 rounded-full"></span>
+                </div>
+                <div>
+                    <p id="footer-user-name" class="text-sm font-bold text-slate-200">Dr. You</p>
+                    <p id="footer-user-spec" class="text-xs text-slate-500">General Surgery</p>
+                </div>
+            </div>
+            
+            <!-- Footer Actions -->
+            <div class="flex items-center gap-1">
+                <button onclick="toggleNotifications()" class="p-2 hover:bg-slate-800 rounded-full text-slate-400 transition-all relative">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                    <div class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-dark-900 notification-blink"></div>
+                </button>
+                <button onclick="openSettings()" class="p-2 hover:bg-slate-800 rounded-full text-slate-400 transition-all">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="flex-1 flex flex-col h-full relative bg-dark-950">
+        <!-- 3D Background (Empty State) -->
+        <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center z-0 overflow-hidden">
+            <div id="canvas-container"></div>
+            <!-- Overlay -->
+            <div class="z-10 text-center p-8 glass-panel rounded-3xl shadow-2xl max-w-md mx-4 animate-slide-up pointer-events-none select-none">
+                <div class="w-20 h-20 bg-slate-800/50 text-medical-500 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/5">
+                    <i data-lucide="orbit" class="w-10 h-10 animate-spin-slow"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-white mb-3">Secure Neural Link</h2>
+                <p class="text-slate-400 mb-8 leading-relaxed">Connect with 50+ verified specialists via our end-to-end encrypted network.</p>
+                <div class="grid grid-cols-2 gap-3 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    <span class="bg-slate-800/50 py-2 rounded-lg border border-slate-700 flex items-center justify-center gap-2"><i data-lucide="shield-check" class="w-3 h-3 text-accent-500"></i> Encrypted</span>
+                    <span class="bg-slate-800/50 py-2 rounded-lg border border-slate-700 flex items-center justify-center gap-2"><i data-lucide="video" class="w-3 h-3 text-medical-500"></i> HD Video</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div id="chat-interface" class="hidden flex-col h-full z-20 glass-panel absolute inset-0 transition-all">
+            <!-- header / messages / footer (unchanged) -->
+            <header class="h-18 py-3 px-4 md:px-6 border-b border-slate-800 flex items-center justify-between bg-dark-900/90 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <button id="back-btn" class="md:hidden p-2 hover:bg-slate-800 rounded-full text-slate-400 transition-colors">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <div class="flex items-center gap-3 cursor-pointer hover:bg-slate-800/50 p-1.5 rounded-lg transition-colors group" onclick="showDoctorProfile()">
+                        <div class="relative">
+                            <img id="chat-header-avatar" src="" class="w-11 h-11 rounded-full border-2 border-slate-700 bg-slate-800 object-cover">
+                            <span class="absolute bottom-0 right-0 w-3 h-3 bg-accent-500 border-2 border-dark-900 rounded-full"></span>
+                        </div>
+                        <div>
+                            <h3 id="chat-header-name" class="font-bold text-slate-100 leading-tight text-lg group-hover:text-medical-400 transition-colors"></h3>
+                            <p id="chat-header-spec" class="text-xs text-medical-500 font-semibold bg-medical-500/10 px-2 py-0.5 rounded-md inline-block mt-0.5 border border-medical-500/20"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 relative">
+                    <div class="relative">
+                        <button onclick="toggleNotifications()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-medical-400 hover:bg-slate-800 rounded-full transition-all relative">
+                            <i data-lucide="bell" class="w-5 h-5"></i>
+                            <div id="notif-badge" class="hidden absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-dark-900 notification-blink"></div>
+                        </button>
+                        <div id="notif-dropdown" class="hidden absolute top-12 right-0 w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 animate-scale-in origin-top-right">
+                            <div class="p-3 border-b border-slate-800 flex justify-between items-center">
+                                <h4 class="font-semibold text-sm text-white">Notifications</h4>
+                                <span id="notif-count" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">0 New</span>
+                            </div>
+                            <div id="notif-list" class="max-h-64 overflow-y-auto p-2">
+                                <div class="text-center text-slate-500 text-xs py-4">No new notifications</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-px h-6 bg-slate-700 mx-1"></div>
+                    <button onclick="startCall('audio')" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-medical-400 hover:bg-slate-800 rounded-full transition-all" title="Audio Call">
+                        <i data-lucide="phone" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="startCall('video')" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-medical-400 hover:bg-slate-800 rounded-full transition-all" title="Video Call">
+                        <i data-lucide="video" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="toggleMenu()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-all">
+                        <i data-lucide="more-vertical" class="w-5 h-5"></i>
+                    </button>
+                    <div id="options-menu" class="hidden absolute top-12 right-0 w-48 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1 z-50 animate-scale-in origin-top-right">
+                        <a href="#" onclick="showDoctorProfile()" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white">View Profile</a>
+                        <a href="#" onclick="showCallHistoryFromProfile()" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white">View Call History</a>
+                        <div class="h-px bg-slate-700 my-1"></div>
+                        <a href="#" onclick="clearChat()" class="block px-4 py-2 text-sm text-red-400 hover:bg-slate-700 hover:text-red-300">Clear Chat</a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Messages -->
+            <div id="messages-container" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth bg-dark-950">
+                <div class="flex justify-center py-6">
+                    <div class="bg-amber-500/10 text-amber-500 text-xs px-4 py-2 rounded-full border border-amber-500/20 flex items-center gap-2 shadow-sm backdrop-blur-sm">
+                        <i data-lucide="lock" class="w-3 h-3"></i>
+                        <span>End-to-end encrypted. HIPAA Compliant.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Input -->
+            <footer class="p-4 bg-dark-900 border-t border-slate-800">
+                <div class="flex items-end gap-3 max-w-5xl mx-auto relative">
+                    <button onclick="triggerFileUpload()" class="p-3 text-slate-400 hover:text-medical-400 hover:bg-slate-800 rounded-2xl transition-all flex-shrink-0">
+                        <i data-lucide="paperclip" class="w-5 h-5"></i>
+                    </button>
+                    
+                    <div id="input-wrapper" class="flex-1 bg-slate-800 rounded-2xl flex items-center p-1.5 focus-within:ring-2 focus-within:ring-medical-500/50 transition-all border border-slate-700 focus-within:border-medical-500 relative overflow-hidden">
+                        <div id="recording-wave" class="absolute inset-0 bg-slate-900 flex items-center justify-center gap-1 hidden z-10">
+                             <span class="text-xs text-red-500 font-bold mr-3 animate-pulse">RECORDING</span>
+                             <div class="wave-bar w-1 h-3 rounded-full"></div>
+                             <div class="wave-bar w-1 h-5 rounded-full"></div>
+                             <div class="wave-bar w-1 h-4 rounded-full"></div>
+                             <div class="wave-bar w-1 h-6 rounded-full"></div>
+                             <div class="wave-bar w-1 h-3 rounded-full"></div>
+                        </div>
+                        <textarea id="message-input" rows="1" placeholder="Type a secure message..." class="w-full bg-transparent border-none focus:ring-0 px-3 py-2 text-sm text-slate-200 placeholder-slate-500 resize-none max-h-32 leading-relaxed" style="min-height: 24px;"></textarea>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="voice-note-btn" onclick="toggleRecording()" class="p-3 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-2xl transition-all flex-shrink-0 relative z-20">
+                            <i data-lucide="mic" class="w-5 h-5"></i>
+                        </button>
+                        <button id="send-btn" onclick="handleSendClick()" class="p-3 bg-medical-600 hover:bg-medical-500 text-white rounded-2xl shadow-lg shadow-medical-500/20 transition-all flex-shrink-0 transform active:scale-95 z-20">
+                            <i data-lucide="send-horizontal" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </main>
+
+    <!-- (All modals and other markup remain unchanged - omitted here for brevity but included above in the full file) -->
+
+    <!-- ---------- SCRIPT: Firebase + Real-time doctors list ---------- -->
+    <script type="module">
+    // Use Firebase modular SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getFirestore, collection, query, where, orderBy, onSnapshot, doc, setDoc, addDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+    // Firebase config (you provided)
+    const firebaseConfig = {
+       apiKey: "AIzaSyDozLLKWzMHLC8nNnvKrZTwEgvLuCt2re0",
+       authDomain: "vidyaaai.firebaseapp.com",
+       projectId: "vidyaaai",
+       storageBucket: "vidyaaai.firebasestorage.app",
+       messagingSenderId: "920193754336",
+       appId: "1:920193754336:web:ff01c0cfe91b3b42a21c85"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // Remove the static array — we will populate this from Firestore
+    let doctors = [];              // array shown in sidebar
+    let doctorsListenerUnsub = null;
+    // Patients for current doctor (populated when authenticated)
+    let patients = [];
+    let patientsListenerUnsub = null;
+
+    // Keep previously declared state from your original script
+    let currentUser = { name: "Dr. You", spec: "General Surgery", hospital: "Vaidya AI Main Hub", uid: null };
+    let activeChatId = null;
+    const messages = {};
+    let mediaRecorder = null, audioChunks = [], isRecording = false, callTimerInterval;
+    let chatUnsub = null;
+
+    // DOM refs (match original)
+    const els = {
+        list: document.getElementById('doctor-list'),
+        chat: document.getElementById('chat-interface'),
+        empty: document.getElementById('empty-state'),
+        msgs: document.getElementById('messages-container'),
+        input: document.getElementById('message-input'),
+        menu: document.getElementById('options-menu'),
+        docModal: document.getElementById('doctor-modal'),
+        recInd: document.getElementById('recording-wave'),
+        voiceBtn: document.getElementById('voice-note-btn'),
+        fileInput: document.getElementById('file-upload'),
+        inputWrapper: document.getElementById('input-wrapper'),
+        notifDropdown: document.getElementById('notif-dropdown'),
+        notifBadge: document.getElementById('notif-badge'),
+        notifList: document.getElementById('notif-list'),
+        notifCount: document.getElementById('notif-count'),
+        footerName: document.getElementById('footer-user-name'),
+        footerSpec: document.getElementById('footer-user-spec'),
+        headerName: document.getElementById('chat-header-name'),
+        headerSpec: document.getElementById('chat-header-spec'),
+        headerAvatar: document.getElementById('chat-header-avatar'),
+        footerAvatar: document.getElementById('footer-avatar')
+    };
+
+    // HELPER: HTML escape
+    function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+
+    // RENDER doctors list (from `doctors` array)
+    function renderDoctors(filter = "") {
+      els.list.innerHTML = "";
+      const filtered = doctors.filter(d => (d.name||'').toLowerCase().includes(filter.toLowerCase()) && d.uid !== currentUser.uid);
+      if(filtered.length === 0){
+        const el = document.createElement('div');
+        el.className = 'p-3 text-sm text-slate-500';
+        el.innerText = 'No registered doctors found.';
+        els.list.appendChild(el);
+        lucide.createIcons();
+        return;
+      }
+      filtered.forEach(doc => {
+        const div = document.createElement('div');
+        div.className = `p-3 rounded-xl cursor-pointer transition-all mb-1 flex items-center gap-3 border ${activeChatId === doc.uid ? 'bg-medical-500/10 border-medical-500/30' : 'hover:bg-slate-800 border-transparent'}`;
+        div.onclick = () => openChatWithDoctor(doc);
+        const onlineMarker = doc.online ? '<span class="absolute bottom-0 right-0 w-3 h-3 bg-accent-500 border-2 border-dark-900 rounded-full"></span>' : '';
+        div.innerHTML = `<div class="relative"><img src="${escapeHtml(doc.avatar||'https://api.dicebear.com/7.x/avataaars/svg?seed=DrDefault&backgroundColor=1e293b')}" class="w-12 h-12 rounded-full bg-slate-800 object-cover">${onlineMarker}</div><div class="flex-1 overflow-hidden"><h4 class="font-semibold text-slate-200 truncate text-sm">${escapeHtml(doc.name)}</h4><p class="text-xs text-medical-500 truncate">${escapeHtml(doc.spec||'')}</p></div>`;
+        els.list.appendChild(div);
+      });
+      lucide.createIcons();
+    }
+
+    // Subscribe to doctors collection in Firestore and keep the local `doctors[]` updated
+    function subscribeDoctorsRealtime() {
+      // clean previous
+      if (doctorsListenerUnsub) { doctorsListenerUnsub(); doctorsListenerUnsub = null; }
+      try {
+        const docsCol = collection(db, 'doctors');
+        const q = query(docsCol);
+        doctorsListenerUnsub = onSnapshot(q, (snap) => {
+          const arr = [];
+          snap.forEach(snapDoc => {
+            const raw = snapDoc.data() || {};
+            const profile = raw.profile || {};
+            const name = profile.name || raw.name || profile.username || raw.displayName || `Dr. ${snapDoc.id.substring(0,6)}`;
+            const spec = profile.spec || raw.spec || raw.speciality || '';
+            const hospital = profile.hospital || raw.hospital || '';
+            const avatar = profile.avatar || raw.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}&backgroundColor=1e293b`;
+            const role = (profile.role || raw.role || '').toString().toLowerCase();
+            const registered = !!(profile.registered || raw.registered || raw.isRegistered || raw.registered===true);
+
+            // If this document corresponds to the currently signed-in user, DON'T add to doctors[] — instead update footer/currentUser info.
+            if (snapDoc.id === currentUser.uid) {
+              // update currentUser display info from authoritative doctor doc
+              currentUser.name = name || currentUser.name;
+              currentUser.spec = spec || currentUser.spec;
+              currentUser.hospital = hospital || currentUser.hospital;
+              // update footer UI (no UI changes elsewhere)
+              if (els.footerName) els.footerName.innerText = currentUser.name;
+              if (els.footerSpec) els.footerSpec.innerText = currentUser.spec || '';
+              if (els.footerAvatar) els.footerAvatar.src = avatar;
+              // skip adding to visible doctors list
+              return;
+            }
+
+            // Only include if registered true OR role equals 'doctor' AND registered not false.
+            if (!registered && role !== 'doctor') {
+              return;
+            }
+
+            arr.push({
+              uid: snapDoc.id,
+              name,
+              spec,
+              hospital,
+              avatar,
+              online: !!(profile.online || raw.online),
+              raw,
+              registered,
+              role
+            });
+          });
+
+          arr.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+          doctors = arr;
+          renderDoctors(document.getElementById('search-input')?.value || '');
+        }, (err) => {
+          console.error("doctors onSnapshot error:", err);
+          doctors = [];
+          renderDoctors('');
+        });
+      } catch (e) {
+        console.error("subscribeDoctorsRealtime exception:", e);
+        doctors = [];
+        renderDoctors('');
+      }
+    }
+
+    // Subscribe to current doctor's patients collection and keep local `patients[]` updated
+    function subscribePatientsRealtime(doctorUid) {
+      if (patientsListenerUnsub) { patientsListenerUnsub(); patientsListenerUnsub = null; }
+      patients = [];
+      if (!doctorUid) return;
+      try {
+        const patientsCol = collection(db, 'doctors', doctorUid, 'patients');
+        const q = query(patientsCol, orderBy('createdAt', 'desc'));
+        patientsListenerUnsub = onSnapshot(q, (snap) => {
+          const arr = [];
+          snap.forEach(docSnap => {
+            const data = docSnap.data() || {};
+            const name = (data.name || data.fullName || data.displayName || '').toString();
+            arr.push({ id: docSnap.id, name: name, raw: data });
+          });
+          patients = arr;
+          console.log('Loaded patients for', doctorUid, 'count:', patients.length);
+        }, (err) => {
+          console.warn('patients onSnapshot error:', err);
+          patients = [];
+        });
+      } catch (e) {
+        console.error('subscribePatientsRealtime error', e);
+        patients = [];
+      }
+    }
+
+    // Open chat with a doctor object (from Firestore)
+    function getChatId(a,b){ return [a,b].sort().join('_'); }
+    function openChatWithDoctor(doc) {
+      activeChatId = doc.uid;
+      if (els.headerName) els.headerName.innerText = doc.name;
+      if (els.headerSpec) els.headerSpec.innerText = doc.spec || '';
+      if (els.headerAvatar) els.headerAvatar.src = doc.avatar;
+      els.empty.classList.add('hidden');
+      els.chat.classList.remove('hidden');
+      els.chat.classList.add('flex');
+
+      // subscribe to messages in collection `chats/{chatId}/messages`
+      const chatId = getChatId(currentUser.uid || 'anon', doc.uid);
+      subscribeToChat(chatId);
+    }
+
+    // Subscribe to chat messages (simple real-time listener if you store messages as described)
+    function subscribeToChat(chatId) {
+      if (chatUnsub) { chatUnsub(); chatUnsub = null; }
+      if (!chatId) return;
+      try {
+        const msgsCol = collection(db, 'chats', chatId, 'messages');
+        const q = query(msgsCol, orderBy('createdAt'));
+        chatUnsub = onSnapshot(q, snap => {
+          messages[chatId] = [];
+          snap.forEach(docSnap => {
+            const d = docSnap.data();
+            messages[chatId].push({
+              id: docSnap.id,
+              senderId: d.senderId,
+              senderName: d.senderName,
+              text: d.text || '',
+              isAudio: !!d.isAudio,
+              audioUrl: d.audioUrl || null,
+              createdAt: d.createdAt ? (d.createdAt.toDate ? d.createdAt.toDate() : new Date(d.createdAt)) : new Date()
+            });
+          });
+          renderMessagesForChat(chatId);
+        }, err => { console.error("chat onSnapshot error:", err); });
+      } catch (e) { console.error("subscribeToChat exception:", e); }
+    }
+
+    function renderMessagesForChat(chatId) {
+      const list = messages[chatId] || [];
+      els.msgs.innerHTML = '';
+      const headerNote = document.createElement('div');
+      headerNote.className = 'flex justify-center py-6';
+      headerNote.innerHTML = `<div class="bg-amber-500/10 text-amber-500 text-xs px-4 py-2 rounded-full border border-amber-500/20 flex items-center gap-2"><i data-lucide="lock" class="w-3 h-3"></i> <span>End-to-end encrypted.</span></div>`;
+      els.msgs.appendChild(headerNote);
+
+      list.forEach(m => {
+        const divWrap = document.createElement('div');
+        divWrap.className = `chat-bubble ${m.senderId === currentUser.uid ? 'sent' : 'received'} animate-slide-up flex flex-col mb-4`;
+        let contentHtml = '';
+        if (m.isAudio && m.audioUrl) {
+          // Handle both data URLs (base64) and regular URLs
+          const audioSrc = m.audioUrl;
+          contentHtml = `<div class="flex items-center gap-3 min-w-[180px]"><button onclick="playAudioLocal(this)" class="p-2.5 rounded-full bg-white/20 hover:bg-white/30"><i data-lucide="play" class="w-4 h-4 fill-current"></i></button><div class="flex-1 flex flex-col gap-1"><div class="h-1 bg-white/30 rounded-full w-full"><div class="h-full bg-white w-1/3 rounded-full"></div></div><span class="text-[10px] font-mono opacity-80">Voice Note</span></div><audio src="${audioSrc}" class="hidden"></audio></div>`;
+        } else {
+          contentHtml = `<span>${escapeHtml(m.text)}</span>`;
+        }
+        const time = (m.createdAt instanceof Date) ? m.createdAt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+        divWrap.innerHTML = `${contentHtml}<div class="text-[10px] opacity-60 mt-1 text-right">${escapeHtml(m.senderName || '')} • ${time}</div>`;
+        els.msgs.appendChild(divWrap);
+      });
+      lucide.createIcons();
+      els.msgs.scrollTop = els.msgs.scrollHeight;
+    }
+
+    window.playAudioLocal = function(btn){
+      const audio = btn.closest('.flex').querySelector('audio');
+      const icon = btn.querySelector('svg') || btn.querySelector('i');
+      if(!audio) { console.error('Audio element not found'); return; }
+      if(!icon) { console.error('Icon element not found'); return; }
+      
+      if(audio.paused){ 
+        document.querySelectorAll('audio').forEach(a=>{ if(a!==audio) a.pause(); }); 
+        audio.play().catch(e=>console.warn(e)); 
+        if (icon.tagName === 'svg' || icon.tagName === 'SVG') {
+          icon.setAttribute('data-lucide','pause'); 
+        } else {
+          icon.setAttribute('data-lucide','pause');
+        }
+        audio.onended = ()=>{ 
+          if (icon.tagName === 'svg' || icon.tagName === 'SVG') {
+            icon.setAttribute('data-lucide','play');
+          } else {
+            icon.setAttribute('data-lucide','play');
+          }
+          lucide.createIcons(); 
+        }; 
+      } else { 
+        audio.pause(); 
+        if (icon.tagName === 'svg' || icon.tagName === 'SVG') {
+          icon.setAttribute('data-lucide','play');
+        } else {
+          icon.setAttribute('data-lucide','play');
+        }
+      }
+      lucide.createIcons();
+    }
+
+    // send message into Firestore
+    async function sendMessageToFirestore(text, isAudio=false, audioUrl=null){
+      if (!activeChatId) {
+        console.error('No active chat ID');
+        alert("Open a doctor's chat first");
+        return;
+      }
+      const chatId = getChatId(currentUser.uid || 'anon', activeChatId);
+      console.log('Sending message to chatId:', chatId, 'isAudio:', isAudio, 'text:', text);
+      try {
+        const messageData = {
+          senderId: currentUser.uid || 'anon',
+          senderName: currentUser.name || 'Unknown',
+          text: text || '',
+          isAudio: !!isAudio,
+          audioUrl: audioUrl || null,
+          createdAt: serverTimestamp()
+        };
+        console.log('Message data:', messageData);
+        await addDoc(collection(db, 'chats', chatId, 'messages'), messageData);
+        console.log('Message sent successfully');
+      } catch (e) {
+        console.error("sendMessageToFirestore failed:", e);
+        alert('Failed to send message: ' + e.message);
+      }
+    }
+
+    window.handleSendClick = function(){
+      console.log('handleSendClick called, isVoiceRecording:', isVoiceRecording);
+      
+      // If voice recording is active, stop it (which will trigger upload and send)
+      if (isVoiceRecording) {
+        console.log('Recording active, stopping and sending...');
+        stopVoiceRecording();
+        return;
+      }
+      
+      // Otherwise send text message
+      const content = els.input.value.trim();
+      if (!content) return;
+      sendMessageToFirestore(content, false, null);
+      els.input.value = '';
+    }
+
+    // basic UI helpers (rest of your original functions unchanged — keep them)
+    function triggerFileUpload(){ els.fileInput.click(); }
+    els.fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) sendMessageToFirestore(`🗂️ Sent file: ${e.target.files[0].name}`, false, null); });
+
+    window.startVoiceSearch = function() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { alert("Voice search not supported in your browser."); return; }
+      
+      const recognition = new SpeechRecognition();
+      const indicator = document.getElementById('voice-search-listening');
+      const searchInput = document.getElementById('search-input');
+      
+      recognition.onstart = () => { 
+        indicator.classList.remove('hidden'); 
+      };
+      
+      recognition.onend = () => { 
+        indicator.classList.add('hidden'); 
+      };
+      
+      recognition.onresult = (event) => {
+        const transcript = (event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript) ? event.results[0][0].transcript : '';
+        const searchTerm = transcript.toLowerCase().trim();
+        
+        if (searchInput) {
+          searchInput.value = searchTerm;
+          renderDoctors(searchTerm);
+        }
+      };
+      
+      recognition.onerror = (event) => {
+        console.error('Voice search error:', event.error);
+        alert('Voice search error: ' + event.error);
+      };
+      
+      recognition.start();
+    };
+
+    function startVoiceCommand(){ /* keep your original voice command code if desired */ 
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { alert("Voice commands not supported."); return; }
+      const recognition = new SpeechRecognition();
+      const indicator = document.getElementById('voice-listening');
+      recognition.onstart = () => { indicator.classList.remove('hidden'); };
+      recognition.onend = () => { indicator.classList.add('hidden'); };
+      recognition.onresult = (event) => {
+        const raw = (event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript) ? event.results[0][0].transcript : '';
+        const command = raw.toLowerCase().trim();
+        const token = command.split(' ').pop();
+
+        // First try to match patients (current doctor's patients)
+        const patientMatch = patients.find(p => (p.name||'').toLowerCase().includes(command) || (p.name||'').toLowerCase().includes(token));
+        if (patientMatch && (command.includes('open') || command.includes('view') || command.includes('patient') || command.includes('search') || command.includes(patientMatch.name.toLowerCase()))) {
+          // Open patient view in new tab
+          const url = `patient.html?user=${encodeURIComponent(patientMatch.name)}&role=patient&pid=${encodeURIComponent(patientMatch.id)}`;
+          window.open(url, '_blank');
+          return;
+        }
+
+        // Fallback: match doctors as before
+        const target = doctors.find(d => (d.name||'').toLowerCase().includes(command) || (d.name||'').toLowerCase().includes(token));
+        if(command.includes("open") || command.includes("chat")){
+          if(target) openChatWithDoctor(target); else alert("Doctor not found.");
+        } else if(command.includes("call")){
+          if(target){ openChatWithDoctor(target); startCall('video'); } else alert("Doctor not found.");
+        } else { alert("Try 'Open Dr. Rajesh', 'Open patient John Doe' or 'Call Dr. Anita'."); }
+      };
+      recognition.start();
+    }
+
+    // write the user to users collection (optional) and show user name in footer
+    async function upsertCurrentUserProfile() {
+      if (!currentUser.uid) return;
+      try {
+        await setDoc(doc(db, 'users', currentUser.uid), { name: currentUser.name, lastSeen: serverTimestamp() }, { merge: true });
+      } catch(e) {
+        console.warn("Couldn't write user profile", e);
+      }
+      if (els.footerName) els.footerName.innerText = currentUser.name;
+      if (els.footerSpec) els.footerSpec.innerText = currentUser.spec || '';
+    }
+
+    // Authentication: sign in anonymously and then start doctors subscription
+    signInAnonymously(auth).catch(err => console.warn("Anonymous sign-in error:", err));
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser.uid = user.uid;
+        // load display name stored in localStorage or prompt once
+        let displayName = localStorage.getItem('vaidya_current_doctor_name');
+        if(!displayName){
+          const p = prompt("Enter your display name (doctor):", "Dr. You");
+          displayName = p ? p.trim() : `Dr.${user.uid.slice(0,6)}`;
+          localStorage.setItem('vaidya_current_doctor_name', displayName);
+        }
+        currentUser.name = displayName;
+        // update UI footer
+        if (els.footerName) els.footerName.innerText = currentUser.name;
+        // upsert profile in Firestore (optional)
+        try { await upsertCurrentUserProfile(); } catch(e){ console.warn(e); }
+        // finally subscribe to doctors collection
+        subscribeDoctorsRealtime();
+        // subscribe to patients for this doctor so voice search can find current patients
+        try { subscribePatientsRealtime(currentUser.uid); } catch(e) { console.warn('subscribePatientsRealtime failed', e); }
+      } else {
+        // not signed in
+        subscribeDoctorsRealtime();
+        // ensure patients unsubscribed
+        if (patientsListenerUnsub) { patientsListenerUnsub(); patientsListenerUnsub = null; patients = []; }
+      }
+    });
+
+    // Wire search input
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.addEventListener('input', (e) => renderDoctors(e.target.value));
+
+    // Clean up on unload
+    window.addEventListener('beforeunload', () => {
+      if (doctorsListenerUnsub) doctorsListenerUnsub();
+      if (chatUnsub) chatUnsub();
+    });
+
+    // ============================================
+    // VOICE NOTES: Recording & Upload to Firebase
+    // ============================================
+    let voiceMediaRecorder = null;
+    let voiceAudioChunks = [];
+    let isVoiceRecording = false;
+    let voiceStream = null;
+
+    window.toggleRecording = async function() {
+      console.log('toggleRecording called, isRecording:', isVoiceRecording);
+      if (isVoiceRecording) {
+        // Stop recording
+        await stopVoiceRecording();
+      } else {
+        // Start recording
+        await startVoiceRecording();
+      }
+    }
+
+    async function startVoiceRecording() {
+      try {
+        console.log('Starting voice recording...');
+        // Request microphone access
+        voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Create MediaRecorder
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+        voiceMediaRecorder = new MediaRecorder(voiceStream, { mimeType });
+        voiceAudioChunks = [];
+        isVoiceRecording = true;
+        console.log('MediaRecorder created with mimeType:', mimeType);
+
+        // Show recording UI
+        const recordingWave = document.getElementById('recording-wave');
+        if (recordingWave) recordingWave.classList.remove('hidden');
+        
+        const voiceBtn = document.getElementById('voice-note-btn');
+        if (voiceBtn) {
+          voiceBtn.classList.add('text-red-500');
+          voiceBtn.classList.remove('text-slate-400', 'hover:text-red-400');
+        }
+
+        // Collect audio data
+        voiceMediaRecorder.ondataavailable = (event) => {
+          console.log('Data available, chunk size:', event.data.size);
+          voiceAudioChunks.push(event.data);
+        };
+
+        // On stop, send audio
+        voiceMediaRecorder.onstop = async () => {
+          console.log('Recording stopped, chunks:', voiceAudioChunks.length);
+          isVoiceRecording = false;
+          
+          // Hide recording UI
+          if (recordingWave) recordingWave.classList.add('hidden');
+          if (voiceBtn) {
+            voiceBtn.classList.remove('text-red-500');
+            voiceBtn.classList.add('text-slate-400', 'hover:text-red-400');
+          }
+
+          // Create blob and upload
+          const audioBlob = new Blob(voiceAudioChunks, { type: mimeType });
+          console.log('Audio blob created, size:', audioBlob.size);
+          voiceAudioChunks = [];
+          
+          // Stop the stream
+          if (voiceStream) {
+            voiceStream.getTracks().forEach(track => track.stop());
+            voiceStream = null;
+          }
+
+          // Upload to Firebase Storage
+          await uploadVoiceNote(audioBlob);
+        };
+
+        console.log('Starting MediaRecorder...');
+        voiceMediaRecorder.start();
+      } catch (err) {
+        console.error('Microphone access denied:', err);
+        isVoiceRecording = false;
+        alert('Microphone access denied. Please enable microphone permissions.');
+      }
+    }
+
+    async function stopVoiceRecording() {
+      console.log('stopVoiceRecording called');
+      if (voiceMediaRecorder && isVoiceRecording) {
+        console.log('Stopping MediaRecorder...');
+        voiceMediaRecorder.stop();
+      }
+    }
+
+    async function uploadVoiceNote(audioBlob) {
+      if (!activeChatId || !currentUser.uid) {
+        console.error('Chat or user not set. activeChatId:', activeChatId, 'currentUser.uid:', currentUser.uid);
+        alert("Open a chat and ensure you're authenticated first");
+        return;
+      }
+
+      try {
+        console.log('Uploading voice note...');
+        
+        // Convert blob to base64 data URL for Firestore storage
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const audioDataUrl = e.target.result; // This is base64 encoded
+            console.log('Audio converted to data URL, size:', audioDataUrl.length);
+            
+            // Send message with audio data URL
+            await sendMessageToFirestore('🎙️ Voice Note', true, audioDataUrl);
+            
+            console.log('Voice note sent successfully');
+          } catch (err) {
+            console.error('Failed to process audio:', err);
+            alert('Failed to send voice note: ' + err.message);
+          }
+        };
+        reader.onerror = function(err) {
+          console.error('Failed to read audio blob:', err);
+          alert('Failed to read audio file: ' + err.message);
+        };
+        
+        // Start reading the blob as data URL
+        reader.readAsDataURL(audioBlob);
+        
+      } catch (err) {
+        console.error('Voice note upload failed:', err);
+        alert('Failed to send voice note: ' + err.message);
+      }
+    }
+
+    // Initialize other UI parts from your original script (call initThree etc)
+
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      if(!container) return;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, container.clientWidth/container.clientHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+      const positions = new Float32Array(2400).map(()=> (Math.random()-0.5)*35);
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+      const particles = new THREE.Points(geometry, new THREE.PointsMaterial({size:0.05, color:0x0ea5e9, transparent:true, opacity:0.5}));
+      scene.add(particles);
+      const network = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(5,1)), new THREE.LineBasicMaterial({ color:0x0f172a, transparent:true, opacity:0.15 }));
+      scene.add(network);
+      camera.position.z = 10;
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true; controls.autoRotate = true; controls.autoRotateSpeed = 1.2;
+      function animate(){ requestAnimationFrame(animate); particles.rotation.y += 0.0015; network.rotation.x += 0.001; controls.update(); renderer.render(scene, camera); }
+      animate();
+      window.addEventListener('resize', ()=>{ camera.aspect = container.clientWidth/container.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(container.clientWidth, container.clientHeight); });
+    }
+    initThree();
+
+    // expose something for debugging
+    window.__V4_DEBUG = { subscribeDoctorsRealtime, sendMessageToFirestore, currentUser, doctors };
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaidya - Professional Medical Grid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- AOS Animation Library -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+
+    <style>
+        body { 
+            background-color: #020617; /* Deep Slate */
+            font-family: 'Montserrat', sans-serif;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .bg-pattern {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%), radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.08), transparent 25%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .patient-card {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .patient-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transition: 0.5s;
+        }
+
+        .patient-card:hover::before { left: 100%; }
+        .patient-card:hover {
+            transform: translateY(-5px);
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        .custom-select { appearance: none; background-repeat: no-repeat; background-position: right 0.7rem top 50%; background-size: 0.65rem auto; }
+
+        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: #0f172a; } ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; } ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .mic-active { animation: pulse-red 2s infinite; color: #f43f5e; text-shadow: 0 0 15px rgba(244, 63, 94, 0.5); border-color: #f43f5e !important; }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); } }
+
+        .signin-input { background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.04); padding: 0.5rem; border-radius: 0.375rem; color: #e2e8f0; width: 100%; }
+
+        #debug-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 92px; z-index: 60; background: rgba(0,0,0,0.7); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; display:none; }
+
+        /* Chat styling inside modal (keeps within modal) */
+        .chat-window { display:flex; flex-direction:column; height: 60vh; max-height: 60vh; }
+        .chat-messages { flex:1; overflow:auto; padding: 1rem; display:flex; flex-direction:column; gap:8px; }
+        .chat-input-row { display:flex; gap:8px; padding:0.8rem; border-top:1px solid rgba(255,255,255,0.04); background: rgba(0,0,0,0.03); }
+        .bubble { max-width:70%; padding:10px 12px; border-radius:12px; font-size:14px; line-height:1.3; }
+        .bubble.me { align-self:flex-end; background: linear-gradient(90deg,#2563eb,#7c3aed); color:white; border-bottom-right-radius:4px; }
+        .bubble.them { align-self:flex-start; background: rgba(255,255,255,0.04); color:#e2e8f0; border-bottom-left-radius:4px; }
+        .msg-meta { font-size:11px; color:#9ca3af; margin-top:6px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div class="bg-pattern"></div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-[#020617]/90 backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-3 md:py-4 flex justify-between items-center shadow-lg">
+        <div class="flex flex-col">
+            <h1 class="text-2xl md:text-4xl font-bold text-white tracking-tighter" style="font-family: 'Rajdhani', sans-serif;">
+                Vaid<span class="text-blue-500">ya</span>
+            </h1>
+            <span class="text-[8px] md:text-[10px] font-mono text-blue-400 tracking-[0.2em] md:tracking-[0.3em] uppercase">Clinical Intelligence Grid</span>
+        </div>
+
+        <div class="flex items-center gap-3 md:gap-6">
+            <div id="voice-feedback" class="hidden lg:flex items-center gap-3 px-4 py-2 rounded-full bg-slate-800/50 border border-white/5">
+                <div class="flex space-x-1 h-3 items-center">
+                    <div class="w-1 h-2 bg-blue-400 animate-pulse"></div>
+                    <div class="w-1 h-3 bg-blue-400 animate-pulse" style="animation-delay: 0.1s"></div>
+                    <div class="w-1 h-2 bg-blue-400 animate-pulse" style="animation-delay: 0.2s"></div>
+                </div>
+                <span id="voice-text" class="text-xs font-mono text-slate-300">SYSTEM READY</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <div class="text-right hidden sm:block">
+                    <div class="text-[10px] text-slate-500 font-bold uppercase">Total Records</div>
+                    <div class="text-base md:text-lg font-mono text-white leading-none" id="total-count">0</div>
+                </div>
+
+                <div id="doctor-area" class="flex items-center gap-3 cursor-pointer select-none" title="Click to sign in / out">
+                    <div id="doctor-avatar" class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center text-white font-bold shadow-lg border border-blue-400/30 text-sm md:text-base">
+                        Dr
+                    </div>
+                    <div id="doctor-name" class="hidden flex-col text-left">
+                        <div id="doctor-name-main" class="text-sm font-medium text-white leading-none">Sign in</div>
+                        <div id="doctor-name-sub" class="text-[10px] text-slate-400">Click to authenticate</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="flex-1 p-4 md:p-8 container mx-auto max-w-7xl">
+        <div class="mb-8 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h2 class="text-xl md:text-2xl font-light text-slate-200">Patients Records</h2>
+                <div class="relative w-full md:w-auto flex-1 max-w-md">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                    <input type="text" id="search-input" placeholder="Search Name or ID..." onkeyup="applyFilters()" class="w-full bg-slate-800/50 border border-white/10 rounded-full py-2.5 pl-10 pr-6 text-sm text-white focus:outline-none focus:border-blue-500 transition-all">
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-3 p-3 bg-slate-900/40 border border-white/5 rounded-xl">
+                <div class="relative">
+                    <select id="status-filter" onchange="applyFilters()" class="custom-select bg-slate-800 text-slate-300 text-xs font-bold py-2 pl-3 pr-8 rounded-lg border border-white/10 hover:border-blue-500 focus:outline-none">
+                        <option value="All">Status: All</option>
+                        <option value="Stable">Stable</option>
+                        <option value="Critical">Critical</option>
+                        <option value="Observation">Observation</option>
+                        <option value="Discharged">Discharged</option>
+                        <option value="Serious">Serious</option>
+                    </select>
+                </div>
+                <div class="relative">
+                    <select id="gender-filter" onchange="applyFilters()" class="custom-select bg-slate-800 text-slate-300 text-xs font-bold py-2 pl-3 pr-8 rounded-lg border border-white/10 hover:border-blue-500 focus:outline-none">
+                        <option value="All">Sex: All</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
+                <div class="relative">
+                    <select id="age-filter" onchange="applyFilters()" class="custom-select bg-slate-800 text-slate-300 text-xs font-bold py-2 pl-3 pr-8 rounded-lg border border-white/10 hover:border-blue-500 focus:outline-none">
+                        <option value="All">Age: All</option>
+                        <option value="Young">18 - 30</option>
+                        <option value="Middle">31 - 50</option>
+                        <option value="Senior">51+</option>
+                    </select>
+                </div>
+
+                <button onclick="resetFilters()" class="text-xs font-bold text-slate-500 hover:text-white px-3 py-2 transition-colors">
+                    <i class="fas fa-undo mr-1"></i> Reset
+                </button>
+            </div>
+        </div>
+
+        <div id="patient-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 pb-20"></div>
+
+        <div id="empty-state" class="hidden text-center py-20">
+            <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
+                <i class="fas fa-search text-2xl"></i>
+            </div>
+            <h3 class="text-slate-400 font-bold">No records found</h3>
+            <p class="text-slate-600 text-sm">Try adjusting your filters or sign in.</p>
+        </div>
+    </main>
+
+    <!-- Floating -->
+    <div class="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-30 flex flex-col gap-3 md:gap-4">
+        <button onclick="showGuide()" class="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 border border-white/10 text-slate-400 hover:text-white hover:border-white/30 shadow-xl flex items-center justify-center transition-all">
+            <i class="fas fa-question text-lg md:text-xl"></i>
+        </button>
+        <button id="mic-btn" class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-2xl shadow-blue-600/30 flex items-center justify-center text-xl md:text-2xl transition-all transform hover:scale-105 border-2 border-transparent">
+            <i class="fas fa-microphone"></i>
+        </button>
+    </div>
+
+    <div id="modal-overlay" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 p-4"></div>
+    <div id="debug-toast"></div>
+
+    <!-- Firebase + App Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import {
+            getFirestore,
+            collection,
+            query,
+            orderBy,
+            onSnapshot,
+            doc,
+            getDoc,
+            getDocs,
+            where,
+            serverTimestamp,
+            addDoc,
+            setDoc
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // firebase config (vidai-2c9fd)
+        const firebaseConfig = {
+              apiKey: "AIzaSyDozLLKWzMHLC8nNnvKrZTwEgvLuCt2re0",
+              authDomain: "vidyaaai.firebaseapp.com",
+              projectId: "vidyaaai",
+              storageBucket: "vidyaaai.firebasestorage.app",
+              messagingSenderId: "920193754336",
+              appId: "1:920193754336:web:ff01c0cfe91b3b42a21c85"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        const conditions = [
+            { name: "Post-Op Recovery", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", status: "Stable" },
+            { name: "Cardiac Monitor", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", status: "Critical" },
+            { name: "Neurology Obs", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", status: "Observation" },
+            { name: "Orthopedics", color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", status: "Stable" },
+            { name: "Respiratory", color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20", status: "Serious" },
+            { name: "General Checkup", color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", status: "Discharged" }
+        ];
+
+        function styleForCondition(condName, statusName) {
+            const found = conditions.find(c => c.name.toLowerCase() === (condName || '').toLowerCase() || c.status.toLowerCase() === (statusName || '').toLowerCase());
+            if (found) return found;
+            const byStatus = conditions.find(c => c.status.toLowerCase() === (statusName||'').toLowerCase());
+            if (byStatus) return byStatus;
+            return { name: condName || 'Unknown', color: "text-slate-300", bg: "bg-slate-700/10", border: "border-white/5", status: statusName || 'Unknown' };
+        }
+
+        // state
+        let patients = [];
+        let unsubPatients = null;
+        let currentDoctorUid = null;
+        let resolvedDoctorDocId = null; // THIS is the doc id used to read patients
+        let currentChatUnsub = null;
+        const grid = document.getElementById('patient-grid');
+        const doctorArea = document.getElementById('doctor-area');
+        const doctorAvatar = document.getElementById('doctor-avatar');
+        const doctorNameMain = document.getElementById('doctor-name-main');
+        const doctorNameSub = document.getElementById('doctor-name-sub');
+        const doctorNameContainer = document.getElementById('doctor-name');
+        const debugToast = document.getElementById('debug-toast');
+
+        function showToast(msg, timeout = 5000) {
+            debugToast.innerText = msg;
+            debugToast.style.display = 'block';
+            clearTimeout(debugToast._t);
+            debugToast._t = setTimeout(() => debugToast.style.display = 'none', timeout);
+            console.log('VAIDYA: ' + msg);
+        }
+
+        function mapDocToPatient(docId, data) {
+            const name = data.name || data.fullName || ("Patient " + (docId || '').slice(-4));
+            const idNum = data.id ?? data.patientId ?? docId;
+            const age = (data.age !== undefined) ? Number(data.age) : (data.dob ? Math.max(18, new Date().getFullYear() - new Date(data.dob).getFullYear()) : Math.floor(Math.random() * 60) + 18);
+            const sexRaw = (data.sex || data.gender || '').toString();
+            const sex = sexRaw ? (sexRaw.charAt(0).toUpperCase() + sexRaw.slice(1).toLowerCase()) : (Math.random() > 0.5 ? 'Male' : 'Female');
+            const condition = data.condition || data.primaryCondition || "General Checkup";
+            const statusRaw = (data.status || data.currentStatus || '').toString();
+            const status = statusRaw ? (statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1)) : styleForCondition(condition).status;
+            const room = data.room || `1${Math.floor(Math.random()*5)+1}0${Math.floor(Math.random()*9)}-${['A','B','C'][Math.floor(Math.random()*3)]}`;
+            const admissionDate = data.admissionDate || (new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const admissionTime = data.admissionTime || `${Math.floor(Math.random()*12)+1}:${String(Math.floor(Math.random()*60)).padStart(2,'0')} ${Math.random()>0.5?'AM':'PM'}`;
+            const doctor = data.doctor || data.attending || "Dr. A. Strange";
+            const bill = data.bill || `₹${(Math.random()*50000 + 2000).toFixed(2)}`;
+            const notes = data.notes || data.clinicalNotes || "";
+            const style = styleForCondition(condition, status);
+            return { docId, id:idNum, name, age, sex, condition, status, style, room, admissionDate, admissionTime, doctor, bill, notes };
+        }
+
+        async function attachPatientsListenerForDoctorDoc(docId) {
+            if (unsubPatients) { try { unsubPatients(); } catch(e){} unsubPatients = null; }
+            resolvedDoctorDocId = docId;
+            if (!docId) {
+                patients = [];
+                renderCards(patients);
+                document.getElementById('total-count').innerText = 0;
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            }
+            try {
+                const colRef = collection(db, "doctors", docId, "patients");
+                try {
+                    const q = query(colRef, orderBy("createdAt", "desc"));
+                    unsubPatients = onSnapshot(q, snap => {
+                        const arr = [];
+                        snap.forEach(d => arr.push(mapDocToPatient(d.id, d.data() || {})));
+                        patients = arr;
+                        renderCards(patients);
+                        document.getElementById('total-count').innerText = patients.length;
+                        if (patients.length === 0) document.getElementById('empty-state').classList.remove('hidden'); else document.getElementById('empty-state').classList.add('hidden');
+                    }, err => {
+                        console.warn("patients snapshot error (ordered)", err);
+                        showToast("Realtime read error (ordered): " + (err.message || err.code || 'unknown'));
+                        fallbackUnorderedSnapshot(colRef);
+                    });
+                } catch(innerErr) {
+                    console.warn('orderBy(createdAt) failed, falling back', innerErr);
+                    showToast('Falling back to unordered patient read');
+                    fallbackUnorderedSnapshot(colRef);
+                }
+            } catch (e) {
+                console.warn('attachPatientsListenerForDoctorDoc failed', e);
+                showToast('Listener attach error: see console');
+                patients = [];
+                renderCards(patients);
+                document.getElementById('total-count').innerText = 0;
+            }
+        }
+
+        function fallbackUnorderedSnapshot(colRef) {
+            try {
+                if (unsubPatients) { try { unsubPatients(); } catch(e){} unsubPatients = null; }
+                unsubPatients = onSnapshot(colRef, snap => {
+                    const arr = [];
+                    snap.forEach(d => arr.push(mapDocToPatient(d.id, d.data() || {})));
+                    patients = arr;
+                    renderCards(patients);
+                    document.getElementById('total-count').innerText = patients.length;
+                    if (patients.length === 0) document.getElementById('empty-state').classList.remove('hidden'); else document.getElementById('empty-state').classList.add('hidden');
+                }, err => {
+                    console.warn('unordered snapshot error', err);
+                    showToast('Realtime read error: ' + (err.message || err.code || err));
+                });
+            } catch(e) {
+                console.warn('fallbackUnorderedSnapshot failed', e);
+                showToast('Fallback listener error');
+            }
+        }
+
+        async function resolveDoctorDocIdForUser(user) {
+            if (!user) return null;
+            try {
+                const directRef = doc(db, 'doctors', user.uid);
+                const directSnap = await getDoc(directRef);
+                if (directSnap.exists()) {
+                    console.log('Resolved doctor doc by uid:', user.uid);
+                    return user.uid;
+                }
+            } catch(e) { console.warn('error reading doctors/{uid}', e); }
+
+            const email = user.email || null;
+            const displayName = user.displayName || null;
+            const guessed = email ? email.split('@')[0] : null;
+            const phone = user.phoneNumber || null;
+
+            if (email) {
+                try {
+                    const q = query(collection(db, 'doctors'), where('profile.email','==', email));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        console.log('Found doctor by profile.email ->', snap.docs[0].id);
+                        return snap.docs[0].id;
+                    }
+                } catch(e) { console.warn('query profile.email failed', e); }
+            }
+
+            const candidates = [displayName, guessed].filter(Boolean);
+            for (const c of candidates) {
+                try {
+                    const q2 = query(collection(db, 'doctors'), where('profile.username','==', c));
+                    const snap2 = await getDocs(q2);
+                    if (!snap2.empty) {
+                        console.log('Found doctor by profile.username ->', snap2.docs[0].id);
+                        return snap2.docs[0].id;
+                    }
+                } catch(e) { console.warn('query profile.username failed for', c, e); }
+            }
+
+            if (phone) {
+                try {
+                    const q3 = query(collection(db, 'doctors'), where('profile.mobile','==', phone));
+                    const snap3 = await getDocs(q3);
+                    if (!snap3.empty) { console.log('Found doctor by profile.mobile ->', snap3.docs[0].id); return snap3.docs[0].id; }
+                } catch(e) { console.warn('query profile.mobile failed', e); }
+            }
+            if (displayName) {
+                try {
+                    const q4 = query(collection(db, 'doctors'), where('profile.name','==', displayName));
+                    const snap4 = await getDocs(q4);
+                    if (!snap4.empty) { console.log('Found doctor by profile.name ->', snap4.docs[0].id); return snap4.docs[0].id; }
+                } catch(e) { console.warn('query profile.name failed', e); }
+            }
+
+            console.warn('Could not resolve doctor doc for user:', user.uid, email, displayName, guessed, phone);
+            showToast('No doctor profile found for this account. Ensure a doctors/{docId} document exists with profile.email or profile.username.', 8000);
+            return null;
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            currentDoctorUid = user ? user.uid : null;
+            if (user) {
+                const resolved = await resolveDoctorDocIdForUser(user);
+                if (resolved) {
+                    try {
+                        const profSnap = await getDoc(doc(db, 'doctors', resolved));
+                        let displayName = user.displayName || user.email || `Dr.${(user.uid||'').slice(-4)}`;
+                        if (profSnap.exists()) {
+                            const pd = profSnap.data() || {};
+                            if (pd.profile && pd.profile.username) displayName = pd.profile.username;
+                            else if (pd.username) displayName = pd.username;
+                            else if (pd.profile && pd.profile.name) displayName = pd.profile.name;
+                        }
+                        doctorNameContainer.classList.remove('hidden');
+                        doctorNameMain.innerText = displayName;
+                        doctorNameSub.innerText = (user.email || '').split('@')[0] || 'Signed in';
+                        doctorAvatar.innerText = (displayName || 'Dr').slice(0,2).toUpperCase();
+                    } catch (e) {
+                        console.warn('failed reading doctor profile for header', e);
+                    }
+
+                    attachPatientsListenerForDoctorDoc(resolved);
+                } else {
+                    doctorNameContainer.classList.remove('hidden');
+                    doctorNameMain.innerText = user.email ? user.email.split('@')[0] : `Dr.${(user.uid||'').slice(-4)}`;
+                    doctorNameSub.innerText = 'No profile';
+                    doctorAvatar.innerText = (doctorNameMain.innerText || 'Dr').slice(0,2).toUpperCase();
+
+                    if (unsubPatients) { try { unsubPatients(); } catch (e){} unsubPatients = null; }
+                    patients = [];
+                    renderCards(patients);
+                    document.getElementById('total-count').innerText = 0;
+                    document.getElementById('empty-state').classList.remove('hidden');
+                }
+            } else {
+                if (unsubPatients) { try { unsubPatients(); } catch(e){} unsubPatients = null; }
+                patients = [];
+                renderCards(patients);
+                document.getElementById('total-count').innerText = 0;
+                doctorNameContainer.classList.remove('hidden');
+                doctorNameMain.innerText = 'Sign in';
+                doctorNameSub.innerText = 'Click to authenticate';
+                doctorAvatar.innerText = 'Dr';
+                document.getElementById('empty-state').classList.remove('hidden');
+            }
+        });
+
+        // Sign-in modal and flows
+        function openSignInModal() {
+            const overlay = document.getElementById('modal-overlay');
+            overlay.innerHTML = `
+                <div class="bg-slate-900 border border-white/10 w-full max-w-sm rounded-2xl p-6 md:p-8 shadow-2xl modal-content transform scale-95 opacity-0 transition-all duration-300 mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-white">Sign in / Sign up</h3>
+                        <button onclick="closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="space-y-3">
+                        <input id="si-email" class="signin-input" placeholder="Email" type="email" />
+                        <input id="si-pass" class="signin-input" placeholder="Password (min 6)" type="password" />
+                        <div class="flex gap-2">
+                            <button id="si-signin" class="w-1/2 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white">Sign in</button>
+                            <button id="si-signup" class="w-1/2 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white">Sign up</button>
+                        </div>
+                        <p class="text-xs text-slate-400">After signing in, this dashboard will load patients from your doctor account (doctors/{uid}/patients).</p>
+                    </div>
+                </div>
+            `;
+            overlay.style.opacity = 1;
+            overlay.style.pointerEvents = 'auto';
+            setTimeout(() => {
+                const mc = overlay.querySelector('.modal-content');
+                if (mc) { mc.classList.remove('scale-95', 'opacity-0'); mc.classList.add('scale-100', 'opacity-100'); }
+            }, 10);
+
+            const signinBtn = document.getElementById('si-signin');
+            const signupBtn = document.getElementById('si-signup');
+            const emailEl = document.getElementById('si-email');
+            const passEl = document.getElementById('si-pass');
+
+            if (signinBtn) signinBtn.onclick = async () => {
+                const email = (emailEl.value || '').trim();
+                const pass = passEl.value || '';
+                if (!email || !pass) return alert('Enter email and password');
+                try {
+                    await signInWithEmailAndPassword(auth, email, pass);
+                    closeModal();
+                } catch (e) {
+                    console.error('Sign-in failed', e);
+                    alert('Sign-in failed: ' + (e.message || e));
+                }
+            };
+
+            if (signupBtn) signupBtn.onclick = async () => {
+                const email = (emailEl.value || '').trim();
+                const pass = passEl.value || '';
+                if (!email || !pass) return alert('Enter email and password');
+                if (pass.length < 6) return alert('Password must be at least 6 chars');
+                try {
+                    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                    try {
+                        const uid = cred.user.uid;
+                        const profile = {
+                            username: email.split('@')[0],
+                            email,
+                            role: 'doctor',
+                            createdAt: new Date().toISOString()
+                        };
+                        await setDoc(doc(db, 'doctors', uid), { profile }, { merge: true });
+                    } catch (writeErr) {
+                        console.warn('Failed to write profile after signup:', writeErr);
+                    }
+                    closeModal();
+                } catch (e) {
+                    console.error('Sign-up failed', e);
+                    alert('Sign-up failed: ' + (e.message || e));
+                }
+            };
+        }
+
+        // renderCards / filter logic
+        function renderCards(data) {
+            grid.innerHTML = '';
+            data.forEach((p, index) => {
+                const card = document.createElement('div');
+                card.className = `patient-card rounded-xl p-6 cursor-pointer group`;
+                card.setAttribute('data-aos', 'fade-up');
+                card.onclick = () => openModal(p);
+
+                // IMPORTANT: include patient doc id for messaging
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-base md:text-lg font-bold text-slate-400 group-hover:text-white group-hover:bg-blue-600 group-hover:border-blue-400 transition-colors">
+                                ${escapeHtml(String(p.name || 'P').charAt(0))}
+                            </div>
+                            <div>
+                                <h3 class="text-base md:text-lg font-bold text-white group-hover:text-blue-300 transition-colors">${escapeHtml(p.name)}</h3>
+                                <div class="flex gap-2 text-[10px] md:text-xs font-mono text-slate-500">
+                                    <span>ID: #${escapeHtml(String(p.id))}</span>
+                                    <span>•</span>
+                                    <span class="text-slate-400">${escapeHtml((p.sex||'').charAt(0))} / ${escapeHtml(String(p.age))}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="status-badge px-2 py-1 md:px-3 md:py-1 rounded-full text-[10px] md:text-xs uppercase border ${p.style.bg} ${p.style.color} ${p.style.border}">
+                            ${escapeHtml(p.status)}
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2 mb-4">
+                        <div class="flex justify-between text-xs md:text-sm">
+                            <span class="text-slate-500">Condition</span>
+                            <span class="text-slate-300 font-medium text-right">${escapeHtml(p.condition)}</span>
+                        </div>
+                        <div class="flex justify-between text-xs md:text-sm">
+                            <span class="text-slate-500">Location</span>
+                            <span class="text-slate-300 font-medium">Room ${escapeHtml(p.room)}</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-white/5 flex justify-between items-center">
+                        <span class="text-[10px] md:text-xs text-slate-600 flex items-center gap-1">
+                            <i class="far fa-clock"></i> ${escapeHtml(p.admissionDate)}
+                        </span>
+                        <i class="fas fa-chevron-right text-slate-600 group-hover:text-white transition-transform group-hover:translate-x-1"></i>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            if (window.AOS && typeof window.AOS.refresh === 'function') window.AOS.refresh();
+        }
+
+        function applyFilters() {
+            const searchText = document.getElementById('search-input').value.toLowerCase();
+            const statusFilter = document.getElementById('status-filter').value;
+            const genderFilter = document.getElementById('gender-filter').value;
+            const ageFilter = document.getElementById('age-filter').value;
+
+            const filtered = (patients || []).filter(p => {
+                const matchesSearch = (p.name || '').toLowerCase().includes(searchText) || 
+                                      String(p.id || '').toLowerCase().includes(searchText) ||
+                                      (p.condition || '').toLowerCase().includes(searchText);
+                
+                const matchesStatus = statusFilter === "All" || p.status === statusFilter;
+                const matchesGender = genderFilter === "All" || (p.sex || '').toLowerCase() === genderFilter.toLowerCase();
+                
+                let matchesAge = true;
+                if (ageFilter === "Young") matchesAge = p.age >= 18 && p.age <= 30;
+                if (ageFilter === "Middle") matchesAge = p.age > 30 && p.age <= 50;
+                if (ageFilter === "Senior") matchesAge = p.age > 50;
+
+                return matchesSearch && matchesStatus && matchesGender && matchesAge;
+            });
+
+            renderCards(filtered);
+            const emptyState = document.getElementById('empty-state');
+            if(filtered.length === 0) emptyState.classList.remove('hidden'); else emptyState.classList.add('hidden');
+            document.getElementById('total-count').innerText = filtered.length;
+        }
+
+        function resetFilters() {
+            document.getElementById('search-input').value = "";
+            document.getElementById('status-filter').value = "All";
+            document.getElementById('gender-filter').value = "All";
+            document.getElementById('age-filter').value = "All";
+            applyFilters();
+        }
+
+        // Modal open/close and details (single clear closeModal definition)
+        const modalOverlay = document.getElementById('modal-overlay');
+
+        function openModal(p) {
+            // include docId in messaging button call
+            modalOverlay.innerHTML = `
+                <div class="bg-slate-900 border border-white/10 w-full max-w-4xl rounded-2xl overflow-hidden shadow-2xl transform scale-95 opacity-0 transition-all duration-300 modal-content max-h-[90vh] flex flex-col">
+                    <div class="flex flex-col md:flex-row h-auto md:h-[600px] overflow-y-auto md:overflow-hidden">
+                        <div class="w-full md:w-1/3 bg-slate-950 p-6 md:p-8 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-white/5 relative">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+                            <div class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-slate-800 shadow-lg flex items-center justify-center text-4xl md:text-5xl font-light text-slate-600 bg-slate-900 mb-4 md:mb-6">
+                                ${escapeHtml(p.name.charAt(0))}
+                            </div>
+                            <h2 class="text-2xl md:text-3xl font-bold text-white mb-1" style="font-family: 'Rajdhani'">${escapeHtml(p.name)}</h2>
+                            <p class="text-blue-500 font-mono text-sm mb-2">#${escapeHtml(String(p.id))}</p>
+                            <p class="text-slate-400 text-xs uppercase tracking-wider mb-6 md:mb-8">${escapeHtml(p.sex)}  •  ${escapeHtml(String(p.age))} Years Old</p>
+                            
+                            <div class="w-full mt-auto space-y-3">
+                                <button onclick="triggerAction('Calling', '${escapeHtml(p.name)}')" class="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold tracking-wider transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2">
+                                    <i class="fas fa-phone-alt"></i> CALL
+                                </button>
+                                <button onclick="triggerAction('Messaging', '${escapeHtml(p.name)}', '${escapeHtml(p.docId)}')" class="w-full py-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold tracking-wider transition-all border border-slate-700 flex items-center justify-center gap-2">
+                                    <i class="fas fa-comment-alt"></i> MESSAGE
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="w-full md:w-2/3 p-6 md:p-8 bg-slate-900/50 flex flex-col overflow-y-auto">
+                            <div class="flex justify-between items-center mb-6 md:mb-8">
+                                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest">Medical Dossier</h3>
+                                <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-white transition-colors"><i class="fas fa-times"></i></button>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-white/5">
+                                    <div class="text-xs text-slate-500 uppercase font-bold mb-1">Condition</div>
+                                    <div class="text-lg text-white ${p.style.color}">${escapeHtml(p.condition)}</div>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-white/5">
+                                    <div class="text-xs text-slate-500 uppercase font-bold mb-1">Current Status</div>
+                                    <div class="text-lg text-white">${escapeHtml(p.status)}</div>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-white/5">
+                                    <div class="text-xs text-slate-500 uppercase font-bold mb-1">Admitted Date</div>
+                                    <div class="text-lg text-white">${escapeHtml(p.admissionDate)}</div>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-white/5">
+                                    <div class="text-xs text-slate-500 uppercase font-bold mb-1">Admitted Time</div>
+                                    <div class="text-lg text-blue-300 flex items-center gap-2">
+                                        <i class="far fa-clock"></i> ${escapeHtml(p.admissionTime)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex-1">
+                                <h4 class="text-xs text-slate-500 uppercase font-bold mb-2">Clinical Notes</h4>
+                                <div class="p-6 rounded-lg bg-slate-800/30 border border-dashed border-slate-700 text-slate-300 leading-relaxed text-sm md:text-base">
+                                    ${escapeHtml(p.notes)}
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6 flex justify-between items-center border-t border-white/5 pt-4">
+                                <span class="text-xs text-slate-500">Attending: ${escapeHtml(p.doctor)}</span>
+                                <span class="text-lg font-mono text-emerald-400">${escapeHtml(p.bill)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modalOverlay.style.opacity = 1;
+            modalOverlay.style.pointerEvents = 'auto';
+            setTimeout(() => {
+                const mc = modalOverlay.querySelector('.modal-content');
+                if (mc) mc.classList.remove('scale-95', 'opacity-0');
+                if (mc) mc.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            // Unsubscribe any active chat listener before closing
+            if (currentChatUnsub) {
+                try { currentChatUnsub(); } catch(e){ console.warn('chat unsub error', e); }
+                currentChatUnsub = null;
+            }
+
+            const content = modalOverlay.querySelector('.modal-content');
+            if(content) {
+                content.classList.remove('scale-100', 'opacity-100');
+                content.classList.add('scale-95', 'opacity-0');
+            }
+            setTimeout(() => {
+                modalOverlay.style.opacity = 0;
+                modalOverlay.style.pointerEvents = 'none';
+                modalOverlay.innerHTML = '';
+            }, 300);
+        }
+
+        // messaging: attach listener for messages for a specific patient doc
+        function attachChatListener(doctorDocId, patientDocId) {
+            if (!doctorDocId || !patientDocId) return;
+            // unsubscribe previous chat if present
+            if (currentChatUnsub) {
+                try { currentChatUnsub(); } catch(e) { console.warn(e); }
+                currentChatUnsub = null;
+            }
+            try {
+                const msgCol = collection(db, 'doctors', doctorDocId, 'patients', patientDocId, 'messages');
+                const q = query(msgCol, orderBy('createdAt', 'asc'));
+                currentChatUnsub = onSnapshot(q, snap => {
+                    const container = document.getElementById('chat-messages');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    snap.forEach(mdoc => {
+                        const md = mdoc.data() || {};
+                        const sender = md.sender || 'patient';
+                        const bubble = document.createElement('div');
+                        bubble.className = 'bubble ' + (sender === 'doctor' ? 'me' : 'them');
+
+                        // support text / audio / file
+                        if (md.type === 'audio' && md.url) {
+                            const playBtn = document.createElement('button');
+                            playBtn.className = 'flex items-center gap-3';
+                            playBtn.innerHTML = `<i class="fas fa-play-circle"></i> Voice note`;
+                            playBtn.onclick = () => {
+                                const audio = new Audio(md.url);
+                                audio.play().catch(e=>console.warn('audio play failed', e));
+                            };
+                            bubble.appendChild(playBtn);
+                            if (md.duration) {
+                                const meta = document.createElement('div'); meta.className = 'msg-meta'; meta.innerText = `${md.duration}s`;
+                                bubble.appendChild(meta);
+                            }
+                        } else if (md.type === 'file' && md.url) {
+                            const link = document.createElement('a');
+                            link.href = md.url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+                            link.innerText = md.name || 'Download file';
+                            link.className = 'underline';
+                            bubble.appendChild(link);
+                            if (md.size) {
+                                const meta = document.createElement('div'); meta.className = 'msg-meta'; meta.innerText = `${(md.size/1024).toFixed(1)} KB`;
+                                bubble.appendChild(meta);
+                            }
+                        } else {
+                            bubble.innerText = md.text || '';
+                            if (md.text && md.text.length === 0 && md.url) bubble.innerText = md.url;
+                        }
+
+                        container.appendChild(bubble);
+                    });
+                    // scroll to bottom
+                    container.scrollTop = container.scrollHeight;
+                }, err => {
+                    console.warn('chat snapshot error', err);
+                    showToast('Chat realtime error: ' + (err.message || err.code || 'unknown'));
+                });
+            } catch (e) {
+                console.warn('attachChatListener failed', e);
+                showToast('Failed to attach chat listener');
+            }
+        }
+
+        async function sendMessageToPatient(doctorDocId, patientDocId, text) {
+            if (!doctorDocId) return alert('Sign in required to send messages');
+            if (!patientDocId) return alert('Patient identifier missing');
+            if (!text || !text.trim()) return;
+            try {
+                const msgCol = collection(db, 'doctors', doctorDocId, 'patients', patientDocId, 'messages');
+                await addDoc(msgCol, { sender: 'doctor', text: text.trim(), type: 'text', createdAt: serverTimestamp() });
+            } catch (e) {
+                console.error('sendMessage error', e);
+                showToast('Failed to send message: ' + (e.message || e.code || 'unknown'));
+            }
+        }
+
+        // send audio message (recorded blob)
+        async function sendAudioMessage(doctorDocId, patientDocId, blob, filename, durationSec=0) {
+            if (!doctorDocId) return alert('Sign in required to send messages');
+            if (!patientDocId) return alert('Patient identifier missing');
+            try {
+                const path = `doctors/${doctorDocId}/patients/${patientDocId}/messages/audio_${Date.now()}_${filename}`;
+                const ref = storageRef(storage, path);
+                const uploadTask = uploadBytesResumable(ref, blob);
+                showToast('Uploading voice note...');
+                await new Promise((res, rej) => {
+                    uploadTask.on('state_changed', null, err => rej(err), () => res());
+                });
+                const url = await getDownloadURL(ref);
+                const msgCol = collection(db, 'doctors', doctorDocId, 'patients', patientDocId, 'messages');
+                await addDoc(msgCol, { sender: 'doctor', type: 'audio', url, name: filename, duration: Math.round(durationSec), createdAt: serverTimestamp() });
+                showToast('Voice note sent');
+            } catch (e) {
+                console.error('sendAudioMessage error', e);
+                showToast('Failed to send voice note: ' + (e.message || e.code || 'unknown'));
+            }
+        }
+
+        // send arbitrary file
+        async function sendFileMessage(doctorDocId, patientDocId, file) {
+            if (!doctorDocId) return alert('Sign in required to send messages');
+            if (!patientDocId) return alert('Patient identifier missing');
+            try {
+                const path = `doctors/${doctorDocId}/patients/${patientDocId}/messages/files/${Date.now()}_${file.name}`;
+                const ref = storageRef(storage, path);
+                const uploadTask = uploadBytesResumable(ref, file);
+                showToast('Uploading file...');
+                await new Promise((res, rej) => {
+                    uploadTask.on('state_changed', null, err => rej(err), () => res());
+                });
+                const url = await getDownloadURL(ref);
+                const msgCol = collection(db, 'doctors', doctorDocId, 'patients', patientDocId, 'messages');
+                await addDoc(msgCol, { sender: 'doctor', type: 'file', url, name: file.name, size: file.size, mime: file.type, createdAt: serverTimestamp() });
+                showToast('File shared');
+            } catch (e) {
+                console.error('sendFileMessage error', e);
+                showToast('Failed to send file: ' + (e.message || e.code || 'unknown'));
+            }
+        }
+
+        // Overwrite triggerAction to handle messaging with docId
+        window.triggerAction = function(action, name, patientDocId) {
+            if (action === 'Messaging') {
+                // open chat UI in modal
+                if (!resolvedDoctorDocId) {
+                    // require sign in
+                    const wants = confirm('You must be signed in as a doctor to message patients. Open sign-in?');
+                    if (wants) openSignInModal();
+                    return;
+                }
+
+                // build chat modal content (includes mic & file)
+                modalOverlay.innerHTML = `
+                    <div class="bg-slate-900 border border-white/10 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl transform scale-95 opacity-0 transition-all duration-300 modal-content max-h-[90vh] flex flex-col">
+                        <div class="flex items-center justify-between p-4 border-b border-white/5">
+                            <div>
+                                <div class="text-sm text-slate-400">Chat with</div>
+                                <div class="text-lg font-bold text-white">${escapeHtml(name)}</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input id="file-input" type="file" class="hidden" />
+                                <button id="attach-file-btn" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-white"><i class="fas fa-paperclip"></i></button>
+                                <button id="close-chat-btn" onclick="closeModal()" class="px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-white"><i class="fas fa-times"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-4 chat-window">
+                            <div id="chat-messages" class="chat-messages"></div>
+                            <div class="chat-input-row">
+                                <button id="chat-record" title="Record voice note" class="px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white"><i class="fas fa-microphone"></i></button>
+                                <input id="chat-input" placeholder="Type a message..." class="w-full rounded-lg px-3 py-2 bg-slate-800/40 border border-white/5 text-white" />
+                                <button id="chat-send" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white">Send</button>
+                            </div>
+                            <div id="recording-indicator" style="display:none;" class="p-3 text-xs text-red-300">Recording... <button id="stop-record" class="ml-3 px-2 py-1 bg-slate-800 rounded">Stop</button></div>
+                        </div>
+                    </div>
+                `;
+                modalOverlay.style.opacity = 1;
+                modalOverlay.style.pointerEvents = 'auto';
+                setTimeout(() => {
+                    const mc = modalOverlay.querySelector('.modal-content');
+                    if (mc) mc.classList.remove('scale-95', 'opacity-0');
+                    if (mc) mc.classList.add('scale-100', 'opacity-100');
+                }, 10);
+
+                // attach listener
+                attachChatListener(resolvedDoctorDocId, patientDocId);
+
+                // wire send button
+                const sendBtn = document.getElementById('chat-send');
+                const inputEl = document.getElementById('chat-input');
+                if (sendBtn && inputEl) {
+                    sendBtn.onclick = async () => {
+                        const txt = inputEl.value || '';
+                        if (!txt.trim()) return;
+                        await sendMessageToPatient(resolvedDoctorDocId, patientDocId, txt);
+                        inputEl.value = '';
+                    };
+                    // allow enter to send
+                    inputEl.addEventListener('keydown', async (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            const txt = inputEl.value || '';
+                            if (!txt.trim()) return;
+                            await sendMessageToPatient(resolvedDoctorDocId, patientDocId, txt);
+                            inputEl.value = '';
+                        }
+                    });
+                }
+
+                // wire file attach
+                const attachBtn = document.getElementById('attach-file-btn');
+                const fileInput = document.getElementById('file-input');
+                attachBtn.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', async (ev) => {
+                    const f = ev.target.files && ev.target.files[0];
+                    if (!f) return;
+                    await sendFileMessage(resolvedDoctorDocId, patientDocId, f);
+                    fileInput.value = null;
+                });
+
+                // voice recording
+                const recordBtn = document.getElementById('chat-record');
+                const recordingIndicator = document.getElementById('recording-indicator');
+                const stopRecBtn = document.getElementById('stop-record');
+                let mediaRecorder = null;
+                let recordedChunks = [];
+                let recordStartTime = 0;
+
+                recordBtn.addEventListener('click', async () => {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return alert('Recording not supported in this browser');
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        recordedChunks = [];
+                        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+                        mediaRecorder.onstop = async () => {
+                            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                            const duration = Math.round((Date.now() - recordStartTime)/1000);
+                            const filename = `voice_${Date.now()}.webm`;
+                            await sendAudioMessage(resolvedDoctorDocId, patientDocId, blob, filename, duration);
+                            recordingIndicator.style.display = 'none';
+                            try { stream.getTracks().forEach(t=>t.stop()); } catch(e){}
+                        };
+                        mediaRecorder.start();
+                        recordStartTime = Date.now();
+                        recordingIndicator.style.display = 'block';
+                    } catch (e) {
+                        console.error('getUserMedia failed', e);
+                        alert('Microphone access denied or unavailable');
+                    }
+                });
+
+                if (stopRecBtn) stopRecBtn.addEventListener('click', () => {
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+                });
+
+                return;
+            }
+
+            // Keep old calling behavior
+            if (action === 'Calling') {
+                modalOverlay.innerHTML = `
+                    <div class="h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-12">
+                        <div class="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-blue-500 text-blue-500 flex items-center justify-center mb-6 animate-pulse">
+                            <i class="fas fa-phone text-3xl md:text-4xl"></i>
+                        </div>
+                        <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Calling ${escapeHtml(name)}...</h2>
+                        <p class="text-slate-400 mb-8 font-mono text-sm">Secure Connection | Encrypted End-to-End</p>
+                        <button onclick="closeModal()" class="px-8 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all border border-slate-600">CANCEL</button>
+                    </div>
+                `;
+                modalOverlay.style.opacity = 1;
+                modalOverlay.style.pointerEvents = 'auto';
+            }
+        };
+
+        // voice recognition (header mic)
+        const micBtn = document.getElementById('mic-btn');
+        const voiceText = document.getElementById('voice-text');
+        
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+
+            micBtn.onclick = () => {
+                recognition.start();
+                micBtn.classList.add('mic-active');
+                voiceText.innerText = "LISTENING...";
+                voiceText.classList.add('text-white');
+            };
+
+            recognition.onresult = (e) => {
+                const text = e.results[0][0].transcript.toLowerCase();
+                voiceText.innerText = `CMD: "${text.toUpperCase()}"`;
+                micBtn.classList.remove('mic-active');
+                
+                if(text.includes('close')) closeModal();
+                if(text.includes('reset')) resetFilters();
+                
+                if(text.includes('show stable')) { document.getElementById('status-filter').value = "Stable"; applyFilters(); }
+                if(text.includes('show critical')) { document.getElementById('status-filter').value = "Critical"; applyFilters(); }
+                if(text.includes('show serious')) { document.getElementById('status-filter').value = "Serious"; applyFilters(); }
+                if(text.includes('show discharged')) { document.getElementById('status-filter').value = "Discharged"; applyFilters(); }
+                
+                if(text.includes('show males') || text.includes('filter male')) { document.getElementById('gender-filter').value = "Male"; applyFilters(); }
+                if(text.includes('show females') || text.includes('filter female')) { document.getElementById('gender-filter').value = "Female"; applyFilters(); }
+
+                const found = patients.find(p => (p.name || '').toLowerCase().includes(text));
+                if(found) openModal(found);
+
+                if (text.includes('scroll down')) window.scrollBy({ top: 500, behavior: 'smooth' });
+                if (text.includes('scroll up')) window.scrollBy({ top: -500, behavior: 'smooth' });
+
+                setTimeout(() => {
+                    voiceText.innerText = "SYSTEM READY";
+                    voiceText.classList.remove('text-white');
+                }, 3000);
+            };
+            
+            recognition.onend = () => micBtn.classList.remove('mic-active');
+        } else {
+            micBtn.style.display = 'none';
+        }
+
+        function escapeHtml(unsafe) {
+            return String(unsafe || '')
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/\"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+        }
+
+        AOS.init({ duration: 600, once: true });
+
+        // debug helper: allow adding a test patient under resolved doctor doc (console)
+        async function addTestPatientForCurrentDoctor(patient) {
+            if (!resolvedDoctorDocId) return alert('No resolved doctor doc id (sign in and ensure profile exists).');
+            try {
+                const colRef = collection(db, 'doctors', resolvedDoctorDocId, 'patients');
+                await addDoc(colRef, { ...patient, createdAt: serverTimestamp() });
+                alert('Test patient added');
+            } catch (e) { console.error('failed to add test patient', e); alert('failed'); }
+        }
+        window.__VAIDYA = window.__VAIDYA || {};
+        Object.assign(window.__VAIDYA, { addTestPatientForCurrentDoctor });
+
+        // --- Expose functions used by inline attributes (minimal compatibility shim) ---
+        window.applyFilters = applyFilters;
+        window.resetFilters = resetFilters;
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+        window.openSignInModal = openSignInModal;
+
+    </script>
+</body>
+</html>
